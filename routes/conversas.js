@@ -18,19 +18,15 @@ router.get('/', async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT 
-        c.*,
-        u.nome as atendente_nome,
-        COUNT(m.id) as total_mensagens
-      FROM conversas c
-      LEFT JOIN usuarios u ON c.atendente_id = u.id
-      LEFT JOIN mensagens m ON m.cliente_telefone = c.cliente_telefone 
-        AND m.empresa_id = c.empresa_id
-      WHERE c.empresa_id = $1 
-        AND c.status = 'ativa'
-      GROUP BY c.id, u.nome
-      ORDER BY c.ultima_msg_em DESC
-    `, [empresaId]);
+  SELECT 
+    c.*,
+    u.nome as atendente_nome
+  FROM conversas c
+  LEFT JOIN usuarios u ON c.atendente_id = u.id
+  WHERE c.empresa_id = $1 
+    AND c.status = 'ativa'
+  ORDER BY c.ultima_msg_em DESC
+`, [empresaId]);
 
     res.json({ conversas: result.rows });
 
