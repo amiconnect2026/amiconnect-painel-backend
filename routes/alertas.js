@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
     // Buscar usuários da empresa para notificar
     const usuarios = await pool.query(`
       SELECT id FROM usuarios 
-      WHERE empresa_id = $1 AND ativo = true
+      WHERE (empresa_id = $1 OR role = 'admin') AND ativo = true
     `, [empresa_id]);
 
     // Criar alerta para cada usuário
