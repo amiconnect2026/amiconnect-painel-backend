@@ -23,6 +23,7 @@ const categoriasRoutes = require('./routes/categorias');
 const conversasRoutes = require('./routes/conversas');
 const alertasRoutes = require('./routes/alertas');
 const pedidosRoutes = require('./routes/pedidos');
+const empresasRoutes = require('./routes/empresas');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/produtos', produtosRoutes);
@@ -30,6 +31,7 @@ app.use('/api/categorias', categoriasRoutes);
 app.use('/api/conversas', conversasRoutes);
 app.use('/api/alertas', alertasRoutes);
 app.use('/api/pedidos', pedidosRoutes);
+app.use('/api/empresas', empresasRoutes);
 
 // Rota raiz
 app.get('/', (req, res) => {
