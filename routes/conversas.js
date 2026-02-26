@@ -72,7 +72,7 @@ router.patch('/:telefone/assumir', async (req, res) => {
         UPDATE sessions 
         SET status = 'humano'
         WHERE empresa_id = $1 
-          AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2)
+          AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2 LIMIT 1)
       `, [empresaId, telefone]);
 
       return res.json({ 
@@ -87,7 +87,7 @@ router.patch('/:telefone/assumir', async (req, res) => {
       UPDATE sessions 
       SET status = 'humano'
       WHERE empresa_id = $1 
-        AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2)
+        AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2 LIMIT 1)
     `, [empresaId, telefone]);
 
     res.json({ 
