@@ -1,9 +1,23 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
 const PORT = process.env.PORT || 3001;
+
+// Exporta io para usar nas rotas
+app.set('io', io);
 
 // Middlewares globais
 app.use(cors());
@@ -33,6 +47,21 @@ app.use('/api/alertas', alertasRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/empresas', empresasRoutes);
 
+// Socket.io - conexões
+io.on('connection', (socket) => {
+  console.log(`🔌 Socket conectado: ${socket.id}`);
+
+  // Atendente entra em uma sala da empresa
+  socket.on('join_empresa', (empresaId) => {
+    socket.join(`empresa_${empresaId}`);
+    console.log(`👤 Socket ${socket.id} entrou na sala empresa_${empresaId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 Socket desconectado: ${socket.id}`);
+  });
+});
+
 // Rota raiz
 app.get('/', (req, res) => {
   res.json({ 
@@ -59,11 +88,12 @@ app.use((err, req, res, next) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🚀 AmiConnect Painel API');
   console.log(`📡 Servidor rodando na porta ${PORT}`);
   console.log(`🌍 URL: http://localhost:${PORT}`);
+  console.log(`🔌 Socket.io ativo`);
   console.log(`📅 Iniciado em: ${new Date().toLocaleString('pt-BR')}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });

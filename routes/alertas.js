@@ -10,7 +10,6 @@ router.post('/webhook', async (req, res) => {
   try {
     const { empresa_id, tipo, titulo, mensagem, link, webhook_secret } = req.body;
 
-    // Verificar secret para segurança
     if (webhook_secret !== process.env.WEBHOOK_SECRET) {
       return res.status(401).json({ error: 'Não autorizado.' });
     }
@@ -19,18 +18,24 @@ router.post('/webhook', async (req, res) => {
       return res.status(400).json({ error: 'empresa_id, tipo e titulo são obrigatórios.' });
     }
 
-    // Buscar usuários da empresa para notificar
     const usuarios = await pool.query(`
       SELECT id FROM usuarios 
       WHERE (empresa_id = $1 OR role = 'admin') AND ativo = true
     `, [empresa_id]);
 
-    // Criar alerta para cada usuário
     for (const usuario of usuarios.rows) {
       await pool.query(`
         INSERT INTO alertas (empresa_id, usuario_id, tipo, titulo, mensagem, link)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [empresa_id, usuario.id, tipo, titulo, mensagem, link]);
+    }
+
+    // Emitir evento Socket.io para a empresa
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`empresa_${empresa_id}`).emit('novo_alerta', {
+        tipo, titulo, mensagem, empresa_id
+      });
     }
 
     res.json({ success: true, total: usuarios.rows.length });
@@ -40,12 +45,8 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// Aplicar autenticação nas rotas abaixo
 router.use(authenticateToken);
 
-// ==========================================
-// GET /api/alertas - Listar alertas do usuário
-// ==========================================
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -61,9 +62,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ==========================================
-// GET /api/alertas/nao-lidos - Contar alertas não lidos
-// ==========================================
 router.get('/nao-lidos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -78,14 +76,10 @@ router.get('/nao-lidos', async (req, res) => {
   }
 });
 
-// ==========================================
-// PATCH /api/alertas/:id/marcar-lido - Marcar como lido
-// ==========================================
 router.patch('/:id/marcar-lido', async (req, res) => {
   try {
     await pool.query(`
-      UPDATE alertas 
-      SET lido = true 
+      UPDATE alertas SET lido = true 
       WHERE id = $1 AND usuario_id = $2
     `, [req.params.id, req.user.id]);
     res.json({ success: true });
@@ -95,25 +89,27 @@ router.patch('/:id/marcar-lido', async (req, res) => {
   }
 });
 
-// ==========================================
-// POST /api/alertas - Criar alerta (uso interno autenticado)
-// ==========================================
 router.post('/', async (req, res) => {
   try {
     const { empresa_id, tipo, titulo, mensagem, link } = req.body;
 
-    // Buscar usuários da empresa para notificar
     const usuarios = await pool.query(`
       SELECT id FROM usuarios 
       WHERE (empresa_id = $1 OR role = 'admin') AND ativo = true
     `, [empresa_id]);
 
-    // Criar alerta para cada usuário
     for (const usuario of usuarios.rows) {
       await pool.query(`
         INSERT INTO alertas (empresa_id, usuario_id, tipo, titulo, mensagem, link)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [empresa_id, usuario.id, tipo, titulo, mensagem, link]);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`empresa_${empresa_id}`).emit('novo_alerta', {
+        tipo, titulo, mensagem, empresa_id
+      });
     }
 
     res.json({ success: true, total: usuarios.rows.length });
