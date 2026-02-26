@@ -148,12 +148,14 @@ router.get('/mensagens/:telefone', async (req, res) => {
       : req.user.empresa_id;
 
     const result = await pool.query(`
-      SELECT m.id, m.role, m.content, m.created_at
-      FROM mensagens m
-      JOIN clientes c ON m.cliente_id = c.id
-      WHERE c.telefone = $1 AND m.empresa_id = $2
-      ORDER BY m.created_at ASC
-      LIMIT 100
+      SELECT * FROM (
+        SELECT m.id, m.role, m.content, m.created_at
+        FROM mensagens m
+        JOIN clientes c ON m.cliente_id = c.id
+        WHERE c.telefone = $1 AND m.empresa_id = $2
+        ORDER BY m.created_at DESC
+        LIMIT 100
+      ) sub ORDER BY created_at ASC
     `, [telefone, empresaId]);
 
     res.json({ mensagens: result.rows });
