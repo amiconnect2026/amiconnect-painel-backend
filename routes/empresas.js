@@ -51,4 +51,27 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.patch('/:id', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo } = req.body;
+    const result = await pool.query(`
+      UPDATE empresas SET
+        taxa_entrega = COALESCE($1, taxa_entrega),
+        tempo_entrega_min = COALESCE($2, tempo_entrega_min),
+        tempo_entrega_max = COALESCE($3, tempo_entrega_max),
+        formas_pagamento = COALESCE($4, formas_pagamento),
+        pedido_minimo = COALESCE($5, pedido_minimo)
+      WHERE id = $6
+      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo
+    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, req.params.id]);
+    res.json({ empresa: result.rows[0] });
+  } catch (error) {
+    console.error('Erro ao atualizar empresa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 module.exports = router;
