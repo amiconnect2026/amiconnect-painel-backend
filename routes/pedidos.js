@@ -170,6 +170,15 @@ router.post('/', async (req, res) => {
       ]);
     }
 
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`empresa_${empresa_id}`).emit('novo_pedido', {
+        pedido_id: result.rows[0].id,
+        cliente_nome: cliente_nome || cliente_telefone,
+        total: total
+      });
+    }
+
     res.json({ 
       success: true, 
       pedido: result.rows[0]
