@@ -219,6 +219,70 @@ router.post('/mensagens/:telefone', async (req, res) => {
   }
 });
 
+// POST /api/conversas/pausar - Pausar bot da empresa
+router.post('/pausar', async (req, res) => {
+  try {
+    const empresaId = req.user.role === 'admin' ? req.body.empresa_id : req.user.empresa_id;
+    const { mensagem_pausa } = req.body;
+
+    // Atualizar empresa como pausada
+    await pool.query(
+      `UPDATE empresas SET bot_pausado = true, mensagem_pausa = $1 WHERE id = $2`,
+      [mensagem_pausa, empresaId]
+    );
+
+    // Assumir conversas ativas nos últimos 30 minutos
+    const conversasAtivas = await pool.query(
+      `SELECT cliente_telefone FROM conversas 
+       WHERE empresa_id = $1 AND status = 'ativa' AND modo = 'bot'
+       AND ultima_msg_em >= NOW() - INTERVAL '30 minutes'`,
+      [empresaId]
+    );
+
+    for (const conversa of conversasAtivas.rows) {
+      await pool.query(
+        `UPDATE conversas SET modo = 'manual', atendente_id = $1, assumido_em = NOW(), updated_at = NOW()
+         WHERE cliente_telefone = $2 AND empresa_id = $3`,
+        [req.user.id, conversa.cliente_telefone, empresaId]
+      );
+      await pool.query(
+        `UPDATE sessions SET status = 'humano'
+         WHERE empresa_id = $1 AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2 LIMIT 1)`,
+        [empresaId, conversa.cliente_telefone]
+      );
+    }
+
+    // Emitir evento Socket.io
+    const io = req.app.get('io');
+    if (io) io.to(`empresa_${empresaId}`).emit('bot_status', { bot_pausado: true });
+
+    res.json({ success: true, conversas_assumidas: conversasAtivas.rows.length });
+  } catch (error) {
+    console.error('Erro ao pausar bot:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// POST /api/conversas/reativar - Reativar bot da empresa
+router.post('/reativar', async (req, res) => {
+  try {
+    const empresaId = req.user.role === 'admin' ? req.body.empresa_id : req.user.empresa_id;
+
+    await pool.query(
+      `UPDATE empresas SET bot_pausado = false WHERE id = $1`,
+      [empresaId]
+    );
+
+    const io = req.app.get('io');
+    if (io) io.to(`empresa_${empresaId}`).emit('bot_status', { bot_pausado: false });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao reativar bot:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 // GET /api/conversas/config/bot-status - Status global do bot
 router.get('/config/bot-status', async (req, res) => {
   try {
@@ -226,8 +290,14 @@ router.get('/config/bot-status', async (req, res) => {
       ? req.query.empresa_id 
       : req.user.empresa_id;
 
+    const result = await pool.query(
+      `SELECT bot_pausado, mensagem_pausa FROM empresas WHERE id = $1`,
+      [empresaId]
+    );
+    const empresa = result.rows[0] || {};
     res.json({ 
-      bot_ativo: true,
+      bot_pausado: empresa.bot_pausado || false,
+      mensagem_pausa: empresa.mensagem_pausa || '',
       empresa_id: empresaId
     });
   } catch (error) {
