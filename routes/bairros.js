@@ -28,10 +28,15 @@ router.get('/verificar', async (req, res) => {
       `SELECT * FROM bairros_entrega WHERE empresa_id = $1 AND ativo = true AND LOWER(bairro) = LOWER($2)`,
       [empresa_id, bairro]
     );
+    const totalBairros = await pool.query(
+      `SELECT COUNT(*) FROM bairros_entrega WHERE empresa_id = $1 AND ativo = true`,
+      [empresa_id]
+    );
+    const temBairros = parseInt(totalBairros.rows[0].count) > 0;
     if (result.rows.length === 0) {
-      return res.json({ encontrado: false, taxa_entrega: null });
+      return res.json({ encontrado: false, tem_bairros: temBairros, taxa_entrega: null });
     }
-    res.json({ encontrado: true, taxa_entrega: result.rows[0].taxa_entrega, bairro: result.rows[0].bairro });
+    res.json({ encontrado: true, tem_bairros: temBairros, taxa_entrega: result.rows[0].taxa_entrega, bairro: result.rows[0].bairro });
   } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
