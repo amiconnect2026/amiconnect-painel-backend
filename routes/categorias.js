@@ -34,34 +34,84 @@ router.get('/', async (req, res) => {
 // POST /api/categorias - Criar categoria
 router.post('/', async (req, res) => {
   try {
-    const { nome, descricao, ordem } = req.body;
+    const { nome, descricao } = req.body;
 
     if (!nome) {
       return res.status(400).json({ error: 'Nome é obrigatório.' });
     }
 
-    const empresaId = req.user.role === 'admin' 
-      ? req.body.empresa_id 
+    const empresaId = req.user.role === 'admin'
+      ? req.body.empresa_id
       : req.user.empresa_id;
 
     if (!empresaId) {
       return res.status(400).json({ error: 'empresa_id é obrigatório.' });
     }
 
+    // Ordem = próximo número da sequência da empresa
+    const ordemResult = await pool.query(
+      'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima FROM categorias WHERE empresa_id = $1',
+      [empresaId]
+    );
+    const proxima = ordemResult.rows[0].proxima;
+
     const result = await pool.query(
-      `INSERT INTO categorias (empresa_id, nome, descricao, ordem) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO categorias (empresa_id, nome, descricao, ordem)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [empresaId, nome, descricao, ordem || 0]
+      [empresaId, nome, descricao || null, proxima]
     );
 
-    res.status(201).json({ 
-      success: true, 
-      categoria: result.rows[0] 
+    res.status(201).json({
+      success: true,
+      categoria: result.rows[0]
     });
 
   } catch (error) {
     console.error('Erro ao criar categoria:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// PATCH /api/categorias/reordenar - Reordenar categorias
+router.patch('/reordenar', async (req, res) => {
+  try {
+    const { ordens } = req.body;
+
+    if (!Array.isArray(ordens) || ordens.length === 0) {
+      return res.status(400).json({ error: 'ordens deve ser um array não vazio.' });
+    }
+
+    // Verificar acesso: buscar a empresa da primeira categoria
+    const checkResult = await pool.query(
+      'SELECT empresa_id FROM categorias WHERE id = $1',
+      [ordens[0].id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Categoria não encontrada.' });
+    }
+
+    const empresaId = checkResult.rows[0].empresa_id;
+
+    if (req.user.role !== 'admin' && empresaId !== req.user.empresa_id) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    // Atualizar todas as ordens em paralelo
+    await Promise.all(
+      ordens.map(({ id, ordem }) =>
+        pool.query(
+          'UPDATE categorias SET ordem = $1, updated_at = NOW() WHERE id = $2',
+          [ordem, id]
+        )
+      )
+    );
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Erro ao reordenar categorias:', error);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
@@ -88,18 +138,22 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    // Atualizar
+    // Preservar valores existentes para campos não enviados
     const result = await pool.query(
-      `UPDATE categorias 
-       SET nome = $1, descricao = $2, ordem = $3, ativo = $4, updated_at = NOW()
+      `UPDATE categorias
+       SET nome = $1,
+           descricao = COALESCE($2, descricao),
+           ordem = COALESCE($3, ordem),
+           ativo = COALESCE($4, ativo),
+           updated_at = NOW()
        WHERE id = $5
        RETURNING *`,
-      [nome, descricao, ordem, ativo, id]
+      [nome, descricao ?? null, ordem ?? null, ativo ?? null, id]
     );
 
-    res.json({ 
-      success: true, 
-      categoria: result.rows[0] 
+    res.json({
+      success: true,
+      categoria: result.rows[0]
     });
 
   } catch (error) {
