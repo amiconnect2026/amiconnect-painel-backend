@@ -4,6 +4,58 @@ const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { filterByTenant } = require('../middleware/tenant');
 
+// GET /api/pedidos/status-entrega?telefone=xxx&empresa_id=yyy&webhook_secret=xxx
+router.get('/status-entrega', async (req, res) => {
+  if (req.query.webhook_secret !== 'amiconnect_webhook_2026') {
+    return res.status(401).json({ error: 'Não autorizado.' });
+  }
+
+  try {
+    const { telefone, empresa_id } = req.query;
+
+    if (!telefone || !empresa_id) {
+      return res.status(400).json({ error: 'telefone e empresa_id são obrigatórios.' });
+    }
+
+    const result = await pool.query(`
+      SELECT
+        p.status,
+        p.created_at,
+        EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 60 AS minutos_desde_confirmacao,
+        e.tempo_entrega_min,
+        e.tempo_entrega_max
+      FROM pedidos p
+      JOIN empresas e ON e.id = p.empresa_id
+      WHERE p.cliente_telefone = $1
+        AND p.empresa_id = $2
+        AND p.status IN ('confirmado', 'entregue')
+        AND p.created_at >= NOW() - INTERVAL '3 hours'
+      ORDER BY p.created_at DESC
+      LIMIT 1
+    `, [telefone, empresa_id]);
+
+    if (result.rows.length === 0) {
+      return res.json({ encontrado: false });
+    }
+
+    const row = result.rows[0];
+    const minutos = Math.floor(row.minutos_desde_confirmacao);
+
+    res.json({
+      encontrado: true,
+      status: row.status,
+      minutos_desde_confirmacao: minutos,
+      tempo_estimado_min: row.tempo_entrega_min,
+      tempo_estimado_max: row.tempo_entrega_max,
+      dentro_prazo: minutos <= row.tempo_entrega_max
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar status de entrega:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 router.use(authenticateToken, filterByTenant);
 
 // GET /api/pedidos - Listar pedidos
@@ -58,53 +110,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/pedidos/status-entrega?telefone=xxx&empresa_id=yyy
-router.get('/status-entrega', async (req, res) => {
-  try {
-    const { telefone, empresa_id } = req.query;
-
-    if (!telefone || !empresa_id) {
-      return res.status(400).json({ error: 'telefone e empresa_id são obrigatórios.' });
-    }
-
-    const result = await pool.query(`
-      SELECT
-        p.status,
-        p.created_at,
-        EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 60 AS minutos_desde_confirmacao,
-        e.tempo_entrega_min,
-        e.tempo_entrega_max
-      FROM pedidos p
-      JOIN empresas e ON e.id = p.empresa_id
-      WHERE p.cliente_telefone = $1
-        AND p.empresa_id = $2
-        AND p.status IN ('confirmado', 'entregue')
-        AND p.created_at >= NOW() - INTERVAL '3 hours'
-      ORDER BY p.created_at DESC
-      LIMIT 1
-    `, [telefone, empresa_id]);
-
-    if (result.rows.length === 0) {
-      return res.json({ encontrado: false });
-    }
-
-    const row = result.rows[0];
-    const minutos = Math.floor(row.minutos_desde_confirmacao);
-
-    res.json({
-      encontrado: true,
-      status: row.status,
-      minutos_desde_confirmacao: minutos,
-      tempo_estimado_min: row.tempo_entrega_min,
-      tempo_estimado_max: row.tempo_entrega_max,
-      dentro_prazo: minutos <= row.tempo_entrega_max
-    });
-
-  } catch (error) {
-    console.error('Erro ao buscar status de entrega:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  }
-});
 
 // GET /api/pedidos/:id - Buscar pedido específico
 router.get('/:id', async (req, res) => {
