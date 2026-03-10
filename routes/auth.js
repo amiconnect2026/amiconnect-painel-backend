@@ -98,6 +98,36 @@ router.post('/logout', authenticateToken, (req, res) => {
   res.json({ success: true, message: 'Logout realizado com sucesso.' });
 });
 
+// POST /api/auth/verificar-senha-gerente - Verifica senha do gerente sem emitir token
+router.post('/verificar-senha-gerente', authenticateToken, async (req, res) => {
+  try {
+    const { empresa_id, senha } = req.body;
+
+    if (!empresa_id || !senha) {
+      return res.status(400).json({ error: 'empresa_id e senha são obrigatórios.' });
+    }
+
+    const result = await pool.query(
+      'SELECT senha_gerente FROM empresas WHERE id = $1',
+      [empresa_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Empresa não encontrada.' });
+    }
+
+    if (!result.rows[0].senha_gerente || result.rows[0].senha_gerente !== senha) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    res.json({ ok: true });
+
+  } catch (error) {
+    console.error('Erro ao verificar senha gerente:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 // POST /api/auth/gerente - Login do gerente via slug e senha
 router.post('/gerente', async (req, res) => {
   try {
