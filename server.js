@@ -39,6 +39,7 @@ const alertasRoutes = require('./routes/alertas');
 const pedidosRoutes = require('./routes/pedidos');
 const empresasRoutes = require('./routes/empresas');
 const socketRoutes = require('./routes/socket');
+const relatoriosRoutes = require('./routes/relatorios');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/produtos', produtosRoutes);
@@ -48,6 +49,7 @@ app.use('/api/alertas', alertasRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/empresas', empresasRoutes);
 app.use('/api/socket', socketRoutes);
+app.use('/api/relatorios', relatoriosRoutes);
 
 // Socket.io - conexões
 io.on('connection', (socket) => {
