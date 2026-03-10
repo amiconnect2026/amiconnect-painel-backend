@@ -98,4 +98,57 @@ router.post('/logout', authenticateToken, (req, res) => {
   res.json({ success: true, message: 'Logout realizado com sucesso.' });
 });
 
+// POST /api/auth/gerente - Login do gerente via slug e senha
+router.post('/gerente', async (req, res) => {
+  try {
+    const { empresa_slug, senha_gerente } = req.body;
+
+    if (!empresa_slug || !senha_gerente) {
+      return res.status(400).json({ error: 'Slug e senha são obrigatórios.' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, nome, plano, senha_gerente
+       FROM empresas
+       WHERE LOWER(REPLACE(nome, ' ', '-')) = LOWER($1)
+          OR LOWER(nome) = LOWER($1)`,
+      [empresa_slug]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Restaurante não encontrado.' });
+    }
+
+    const empresa = result.rows[0];
+
+    if (!empresa.senha_gerente || empresa.senha_gerente !== senha_gerente) {
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    const token = jwt.sign(
+      {
+        role: 'gerente',
+        empresa_id: empresa.id,
+        nome: empresa.nome
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      empresa: {
+        id: empresa.id,
+        nome: empresa.nome,
+        plano: empresa.plano
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro no login gerente:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 module.exports = router;
