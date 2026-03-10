@@ -164,6 +164,19 @@ router.post('/', async (req, res) => {
       observacoes
     } = req.body;
 
+    const duplicado = await pool.query(`
+      SELECT id FROM pedidos
+      WHERE cliente_telefone = $1
+        AND empresa_id = $2
+        AND status IN ('pendente', 'confirmado')
+        AND created_at >= NOW() - INTERVAL '10 minutes'
+      LIMIT 1
+    `, [cliente_telefone, empresa_id]);
+
+    if (duplicado.rows.length > 0) {
+      return res.status(409).json({ error: 'Pedido duplicado', pedido_existente: true });
+    }
+
     const result = await pool.query(`
       INSERT INTO pedidos (
         empresa_id,
