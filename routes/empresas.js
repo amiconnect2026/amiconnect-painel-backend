@@ -97,4 +97,53 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// POST /api/empresas/conectar-whatsapp
+router.post('/conectar-whatsapp', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const { code, phone_number_id, waba_id, empresa_id } = req.body;
+
+    if (!code || !phone_number_id || !waba_id || !empresa_id) {
+      return res.status(400).json({ error: 'code, phone_number_id, waba_id e empresa_id são obrigatórios.' });
+    }
+
+    // Troca o code pelo access_token via servidor
+    const tokenRes = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: '1719530826122495',
+        client_secret: process.env.META_APP_SECRET,
+        code,
+        redirect_uri: ''
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (!tokenRes.ok || !tokenData.access_token) {
+      console.error('Erro ao trocar code pelo access_token:', tokenData);
+      return res.status(502).json({ error: 'Falha ao obter access_token da Meta.' });
+    }
+
+    // Salva na tabela empresas
+    await pool.query(`
+      UPDATE empresas
+      SET whatsapp_access_token = $1,
+          phone_number_id       = $2,
+          waba_id               = $3
+      WHERE id = $4
+    `, [tokenData.access_token, phone_number_id, waba_id, empresa_id]);
+
+    res.json({ success: true, phone_number_id });
+
+  } catch (error) {
+    console.error('Erro ao conectar WhatsApp:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 module.exports = router;
