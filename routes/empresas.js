@@ -77,7 +77,7 @@ router.patch('/:id', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
-    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente } = req.body;
+    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente, horario_funcionamento } = req.body;
     const result = await pool.query(`
       UPDATE empresas SET
         taxa_entrega = COALESCE($1, taxa_entrega),
@@ -93,10 +93,11 @@ router.patch('/:id', async (req, res) => {
         nome = COALESCE($12, nome),
         whatsapp = COALESCE($13, whatsapp),
         plano = COALESCE($14, plano),
-        senha_gerente = COALESCE($15, senha_gerente)
+        senha_gerente = COALESCE($15, senha_gerente),
+        horario_funcionamento = COALESCE($16, horario_funcionamento)
       WHERE id = $10
-      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano
-    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null]);
+      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano, horario_funcionamento
+    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null, horario_funcionamento || null]);
     res.json({ empresa: result.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error);
