@@ -309,7 +309,7 @@ router.patch('/:id/arquivar', async (req, res) => {
       : req.user.empresa_id;
 
     const pedido = await pool.query(
-      'SELECT status FROM pedidos WHERE id = $1 AND empresa_id = $2',
+      'SELECT status, impresso FROM pedidos WHERE id = $1 AND empresa_id = $2',
       [req.params.id, empresaId]
     );
 
@@ -317,9 +317,9 @@ router.patch('/:id/arquivar', async (req, res) => {
       return res.status(404).json({ error: 'Pedido não encontrado.' });
     }
 
-    const { status } = pedido.rows[0];
-    if (status !== 'entregue' && status !== 'cancelado') {
-      return res.status(400).json({ error: 'Apenas pedidos entregues ou cancelados podem ser arquivados.' });
+    const { status, impresso } = pedido.rows[0];
+    if (!impresso && status !== 'cancelado') {
+      return res.status(400).json({ error: 'Apenas pedidos impressos ou cancelados podem ser arquivados.' });
     }
 
     await pool.query(
