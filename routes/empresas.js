@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const bcrypt = require('bcrypt');
 
 router.use(authenticateToken);
 
@@ -93,6 +94,52 @@ router.patch('/:id', async (req, res) => {
     res.json({ empresa: result.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// POST /api/empresas/cadastrar
+router.post('/cadastrar', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const { nome, whatsapp, email, senha, plano, senha_gerente } = req.body;
+
+    if (!nome || !email || !senha || !plano) {
+      return res.status(400).json({ error: 'nome, email, senha e plano são obrigatórios.' });
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const empresaResult = await client.query(`
+        INSERT INTO empresas (nome, whatsapp, plano, senha_gerente)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+      `, [nome, whatsapp || null, plano, senha_gerente || null]);
+
+      const empresa_id = empresaResult.rows[0].id;
+
+      await client.query(`
+        INSERT INTO usuarios (empresa_id, email, senha, role)
+        VALUES ($1, $2, $3, 'usuario')
+      `, [empresa_id, email, senhaHash]);
+
+      await client.query('COMMIT');
+      res.json({ success: true, empresa_id });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Erro ao cadastrar empresa:', error);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
