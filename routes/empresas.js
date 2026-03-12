@@ -157,10 +157,10 @@ router.post('/conectar-whatsapp', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    const { code, phone_number_id, waba_id, empresa_id } = req.body;
+    const { code, empresa_id } = req.body;
 
-    if (!code || !phone_number_id || !waba_id || !empresa_id) {
-      return res.status(400).json({ error: 'code, phone_number_id, waba_id e empresa_id são obrigatórios.' });
+    if (!code || !empresa_id) {
+      return res.status(400).json({ error: 'code e empresa_id são obrigatórios.' });
     }
 
     // Troca o code pelo access_token via servidor
@@ -182,16 +182,14 @@ router.post('/conectar-whatsapp', async (req, res) => {
       return res.status(502).json({ error: 'Falha ao obter access_token da Meta.' });
     }
 
-    // Salva na tabela empresas
+    // Salva apenas o access_token — phone_number_id e waba_id serão preenchidos manualmente
     await pool.query(`
       UPDATE empresas
-      SET whatsapp_access_token = $1,
-          phone_number_id       = $2,
-          waba_id               = $3
-      WHERE id = $4
-    `, [tokenData.access_token, phone_number_id, waba_id, empresa_id]);
+      SET whatsapp_access_token = $1
+      WHERE id = $2
+    `, [tokenData.access_token, empresa_id]);
 
-    res.json({ success: true, phone_number_id });
+    res.json({ success: true });
 
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);
