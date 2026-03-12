@@ -70,14 +70,19 @@ router.get('/', async (req, res) => {
     }
 
     const { status, data_inicial, data_final, limit = 50 } = req.query;
+    const arquivado = req.query.arquivado === 'true' ? true : req.query.arquivado === 'false' ? false : false;
 
     let query = `
-      SELECT * FROM pedidos 
+      SELECT * FROM pedidos
       WHERE empresa_id = $1
     `;
-    
+
     const params = [empresaId];
     let paramIndex = 2;
+
+    query += ` AND arquivado = $${paramIndex}`;
+    params.push(arquivado);
+    paramIndex++;
 
     if (status) {
       query += ` AND status = $${paramIndex}`;
@@ -292,6 +297,39 @@ router.patch('/:id/status', async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao atualizar status:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// PATCH /api/pedidos/:id/arquivar
+router.patch('/:id/arquivar', async (req, res) => {
+  try {
+    const empresaId = req.user.role === 'admin'
+      ? req.body.empresa_id
+      : req.user.empresa_id;
+
+    const pedido = await pool.query(
+      'SELECT status FROM pedidos WHERE id = $1 AND empresa_id = $2',
+      [req.params.id, empresaId]
+    );
+
+    if (pedido.rows.length === 0) {
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+
+    const { status } = pedido.rows[0];
+    if (status !== 'entregue' && status !== 'cancelado') {
+      return res.status(400).json({ error: 'Apenas pedidos entregues ou cancelados podem ser arquivados.' });
+    }
+
+    await pool.query(
+      'UPDATE pedidos SET arquivado = true WHERE id = $1 AND empresa_id = $2',
+      [req.params.id, empresaId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao arquivar pedido:', error);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
