@@ -15,8 +15,9 @@ router.get('/', async (req, res) => {
 
     const result = await pool.query(`
       SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo,
-             tempo_entrega_min, tempo_entrega_max, plano, formas_pagamento
-      FROM empresas 
+             tempo_entrega_min, tempo_entrega_max, plano, formas_pagamento,
+             ativo, phone_number_id, whatsapp
+      FROM empresas
       ORDER BY nome ASC
     `);
 
@@ -76,7 +77,7 @@ router.patch('/:id', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
-    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude } = req.body;
+    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente } = req.body;
     const result = await pool.query(`
       UPDATE empresas SET
         taxa_entrega = COALESCE($1, taxa_entrega),
@@ -87,10 +88,15 @@ router.patch('/:id', async (req, res) => {
         endereco_restaurante = COALESCE($6, endereco_restaurante),
         raio_entrega_km = COALESCE($7, raio_entrega_km),
         latitude = COALESCE($8, latitude),
-        longitude = COALESCE($9, longitude)
+        longitude = COALESCE($9, longitude),
+        ativo = COALESCE($11, ativo),
+        nome = COALESCE($12, nome),
+        whatsapp = COALESCE($13, whatsapp),
+        plano = COALESCE($14, plano),
+        senha_gerente = COALESCE($15, senha_gerente)
       WHERE id = $10
-      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude
-    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id]);
+      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano
+    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null]);
     res.json({ empresa: result.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error);
