@@ -334,6 +334,62 @@ router.patch('/:id/arquivar', async (req, res) => {
   }
 });
 
+// PATCH /api/pedidos/:id/saiu-entrega
+router.patch('/:id/saiu-entrega', async (req, res) => {
+  try {
+    const empresaId = req.user.role === 'admin'
+      ? req.body.empresa_id
+      : req.user.empresa_id;
+
+    // Buscar pedido e status atual
+    const pedidoRes = await pool.query(
+      'SELECT status, cliente_telefone, cliente_nome, empresa_id FROM pedidos WHERE id = $1 AND empresa_id = $2',
+      [req.params.id, empresaId]
+    );
+
+    if (pedidoRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+
+    const { status: statusAnterior, cliente_telefone, cliente_nome, empresa_id } = pedidoRes.rows[0];
+
+    // Buscar phone_number_id da empresa
+    const empresaRes = await pool.query(
+      'SELECT phone_number_id FROM empresas WHERE id = $1',
+      [empresa_id]
+    );
+    const phone_number_id = empresaRes.rows[0]?.phone_number_id;
+
+    // Atualizar status
+    await pool.query(
+      'UPDATE pedidos SET status = $1, updated_at = NOW() WHERE id = $2 AND empresa_id = $3',
+      ['saiu_entrega', req.params.id, empresaId]
+    );
+
+    // Gravar histórico
+    await pool.query(
+      'INSERT INTO pedidos_historico (pedido_id, status_anterior, status_novo, usuario_id) VALUES ($1, $2, $3, $4)',
+      [req.params.id, statusAnterior, 'saiu_entrega', req.user.id]
+    );
+
+    // Webhook N8N
+    try {
+      await fetch('https://n8n.amiconnect.com.br/webhook/saiu-para-entrega', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: cliente_telefone, nome: cliente_nome, phone_number_id, empresa_id })
+      });
+    } catch (webhookErr) {
+      console.error('Webhook saiu-para-entrega falhou:', webhookErr.message);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao marcar saiu para entrega:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 // PATCH /api/pedidos/:id/imprimir - Marcar como impresso
 router.patch('/:id/imprimir', async (req, res) => {
   try {

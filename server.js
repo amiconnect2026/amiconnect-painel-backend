@@ -91,6 +91,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor.' });
 });
 
+// Jobs
+const { iniciarFollowup } = require('./jobs/followup');
+iniciarFollowup();
+
 // Iniciar servidor
 server.listen(PORT, () => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
