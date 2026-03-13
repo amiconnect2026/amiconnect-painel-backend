@@ -47,6 +47,61 @@ router.get('/geocodificar', async (req, res) => {
   }
 });
 
+// GET /api/empresas/:id/taxas-entrega
+router.get('/:id/taxas-entrega', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+    const result = await pool.query(
+      'SELECT id, distancia_ate_km, taxa FROM taxas_entrega WHERE empresa_id = $1 ORDER BY distancia_ate_km ASC',
+      [req.params.id]
+    );
+    res.json({ taxas: result.rows });
+  } catch (error) {
+    console.error('Erro ao listar taxas:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// POST /api/empresas/:id/taxas-entrega
+router.post('/:id/taxas-entrega', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+    const { distancia_ate_km, taxa } = req.body;
+    if (!distancia_ate_km || taxa == null) {
+      return res.status(400).json({ error: 'distancia_ate_km e taxa são obrigatórios.' });
+    }
+    const result = await pool.query(
+      'INSERT INTO taxas_entrega (empresa_id, distancia_ate_km, taxa) VALUES ($1, $2, $3) RETURNING id, distancia_ate_km, taxa',
+      [req.params.id, distancia_ate_km, taxa]
+    );
+    res.json({ taxa: result.rows[0] });
+  } catch (error) {
+    console.error('Erro ao adicionar taxa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// DELETE /api/empresas/:id/taxas-entrega/:taxaId
+router.delete('/:id/taxas-entrega/:taxaId', async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+    await pool.query(
+      'DELETE FROM taxas_entrega WHERE id = $1 AND empresa_id = $2',
+      [req.params.taxaId, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao remover taxa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 // GET /api/empresas/:id - Buscar empresa específica
 router.get('/:id', async (req, res) => {
   try {
@@ -57,7 +112,8 @@ router.get('/:id', async (req, res) => {
     const result = await pool.query(`
       SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo,
              tempo_entrega_min, tempo_entrega_max, plano, formas_pagamento,
-             endereco_restaurante, raio_entrega_km, latitude, longitude, foto_capa
+             endereco_restaurante, raio_entrega_km, latitude, longitude, foto_capa,
+             permite_retirada
       FROM empresas
       WHERE id = $1
     `, [req.params.id]);
@@ -78,7 +134,7 @@ router.patch('/:id', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
-    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente, horario_funcionamento } = req.body;
+    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente, horario_funcionamento, permite_retirada } = req.body;
     const result = await pool.query(`
       UPDATE empresas SET
         taxa_entrega = COALESCE($1, taxa_entrega),
@@ -95,10 +151,11 @@ router.patch('/:id', async (req, res) => {
         whatsapp = COALESCE($13, whatsapp),
         plano = COALESCE($14, plano),
         senha_gerente = COALESCE($15, senha_gerente),
-        horario_funcionamento = COALESCE($16, horario_funcionamento)
+        horario_funcionamento = COALESCE($16, horario_funcionamento),
+        permite_retirada = COALESCE($17, permite_retirada)
       WHERE id = $10
-      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano, horario_funcionamento
-    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null, horario_funcionamento || null]);
+      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano, horario_funcionamento, permite_retirada
+    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null, horario_funcionamento || null, permite_retirada ?? null]);
     res.json({ empresa: result.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error);
