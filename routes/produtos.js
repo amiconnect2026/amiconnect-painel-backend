@@ -25,7 +25,7 @@ router.get('/publico/:empresa_id', async (req, res) => {
 
     // Buscar dados da empresa
     const empresaResult = await pool.query(
-      'SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo, tempo_entrega_min, tempo_entrega_max, whatsapp FROM empresas WHERE id = $1',
+      'SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo, tempo_entrega_min, tempo_entrega_max, whatsapp, foto_capa FROM empresas WHERE id = $1',
       [empresa_id]
     );
 
@@ -35,8 +35,9 @@ router.get('/publico/:empresa_id', async (req, res) => {
 
     // Buscar produtos disponíveis com categoria
     const produtosResult = await pool.query(`
-      SELECT 
+      SELECT
         p.id, p.nome, p.descricao, p.preco, p.imagem_url, p.disponivel,
+        p.destaque, p.tipo_destaque, p.desconto_percent, p.promocao_ativa, p.is_novo,
         c.nome as categoria_nome, c.ordem as categoria_ordem
       FROM produtos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
@@ -113,7 +114,7 @@ router.get('/:id', async (req, res) => {
 // ==========================================
 router.post('/', upload.single('imagem'), async (req, res) => {
   try {
-    const { categoria_id, nome, descricao, preco, disponivel, ordem } = req.body;
+    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo } = req.body;
 
     if (!nome || !preco) {
       return res.status(400).json({ error: 'Nome e preço são obrigatórios.' });
@@ -135,10 +136,13 @@ router.post('/', upload.single('imagem'), async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO produtos (empresa_id, categoria_id, nome, descricao, preco, disponivel, ordem, imagem_url) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      `INSERT INTO produtos (empresa_id, categoria_id, nome, descricao, preco, disponivel, ordem, imagem_url, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [empresaId, categoria_id, nome, descricao, preco, disponivel !== false, ordem || 0, imagemUrl]
+      [empresaId, categoria_id, nome, descricao, preco, disponivel !== false, ordem || 0, imagemUrl,
+       destaque === 'true', tipo_destaque || null,
+       desconto_percent !== '' && desconto_percent != null ? parseFloat(desconto_percent) : null,
+       promocao_ativa === 'true', is_novo === 'true']
     );
 
     res.status(201).json({ success: true, produto: result.rows[0] });
@@ -154,7 +158,7 @@ router.post('/', upload.single('imagem'), async (req, res) => {
 router.put('/:id', upload.single('imagem'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoria_id, nome, descricao, preco, disponivel, ordem } = req.body;
+    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo, remover_imagem } = req.body;
 
     const checkResult = await pool.query('SELECT * FROM produtos WHERE id = $1', [id]);
 
@@ -167,23 +171,28 @@ router.put('/:id', upload.single('imagem'), async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    // Upload de nova imagem se enviada
+    // Upload de nova imagem, remoção ou manter a existente
     let imagemUrl = produto.imagem_url;
     if (req.file) {
-      // Deletar imagem antiga do Cloudinary
       await deleteFromCloudinary(produto.imagem_url);
-      // Upload nova imagem
       const resultado = await uploadToCloudinary(req.file.buffer, 'produtos');
       imagemUrl = resultado.secure_url;
+    } else if (remover_imagem === 'true') {
+      await deleteFromCloudinary(produto.imagem_url);
+      imagemUrl = null;
     }
 
     const result = await pool.query(
-      `UPDATE produtos 
-       SET categoria_id = $1, nome = $2, descricao = $3, preco = $4, 
-           disponivel = $5, ordem = $6, imagem_url = $7, updated_at = NOW()
-       WHERE id = $8
+      `UPDATE produtos
+       SET categoria_id = $1, nome = $2, descricao = $3, preco = $4,
+           disponivel = $5, ordem = $6, imagem_url = $7, updated_at = NOW(),
+           destaque = $8, tipo_destaque = $9, desconto_percent = $10, promocao_ativa = $11, is_novo = $12
+       WHERE id = $13
        RETURNING *`,
-      [categoria_id, nome, descricao, preco, disponivel, ordem, imagemUrl, id]
+      [categoria_id, nome, descricao, preco, disponivel, ordem, imagemUrl,
+       destaque === 'true', tipo_destaque || null,
+       desconto_percent !== '' && desconto_percent != null ? parseFloat(desconto_percent) : null,
+       promocao_ativa === 'true', is_novo === 'true', id]
     );
 
     res.json({ success: true, produto: result.rows[0] });

@@ -1,0 +1,9 @@
+-- Run this against your PostgreSQL database
+
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS destaque BOOLEAN DEFAULT false;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS tipo_destaque TEXT DEFAULT null;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS desconto_percent NUMERIC DEFAULT null;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS promocao_ativa BOOLEAN DEFAULT false;
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS is_novo BOOLEAN DEFAULT false;
+
+ALTER TABLE empresas ADD COLUMN IF NOT EXISTS foto_capa TEXT DEFAULT null;

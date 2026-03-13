@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const bcrypt = require('bcrypt');
+const { upload, uploadToCloudinary, deleteFromCloudinary } = require('../middleware/upload');
 
 router.use(authenticateToken);
 
@@ -56,8 +57,8 @@ router.get('/:id', async (req, res) => {
     const result = await pool.query(`
       SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo,
              tempo_entrega_min, tempo_entrega_max, plano, formas_pagamento,
-             endereco_restaurante, raio_entrega_km, latitude, longitude
-      FROM empresas 
+             endereco_restaurante, raio_entrega_km, latitude, longitude, foto_capa
+      FROM empresas
       WHERE id = $1
     `, [req.params.id]);
 
@@ -194,6 +195,36 @@ router.post('/conectar-whatsapp', async (req, res) => {
 
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// PATCH /api/empresas/:id/foto-capa
+router.patch('/:id/foto-capa', upload.single('foto_capa'), async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const empresaResult = await pool.query('SELECT foto_capa FROM empresas WHERE id = $1', [req.params.id]);
+    if (empresaResult.rows.length === 0) return res.status(404).json({ error: 'Empresa não encontrada.' });
+
+    const empresa = empresaResult.rows[0];
+    let fotoCapa = empresa.foto_capa;
+
+    if (req.file) {
+      await deleteFromCloudinary(empresa.foto_capa);
+      const resultado = await uploadToCloudinary(req.file.buffer, 'capas');
+      fotoCapa = resultado.secure_url;
+    } else if (req.body.remover_foto_capa === 'true') {
+      await deleteFromCloudinary(empresa.foto_capa);
+      fotoCapa = null;
+    }
+
+    await pool.query('UPDATE empresas SET foto_capa = $1 WHERE id = $2', [fotoCapa, req.params.id]);
+    res.json({ success: true, foto_capa: fotoCapa });
+  } catch (error) {
+    console.error('Erro ao atualizar foto de capa:', error);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
