@@ -191,9 +191,9 @@ router.post('/cadastrar', async (req, res) => {
       const empresa_id = empresaResult.rows[0].id;
 
       await client.query(`
-        INSERT INTO usuarios (empresa_id, email, senha_hash, role)
-        VALUES ($1, $2, $3, 'usuario')
-      `, [empresa_id, email, senhaHash]);
+        INSERT INTO usuarios (empresa_id, nome, email, senha_hash, role)
+        VALUES ($1, $2, $3, $4, 'usuario')
+      `, [empresa_id, nome, email, senhaHash]);
 
       await client.query('COMMIT');
       res.json({ success: true, empresa_id });
