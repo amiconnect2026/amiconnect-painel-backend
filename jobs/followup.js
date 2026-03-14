@@ -21,7 +21,7 @@ async function runFollowup() {
           SELECT 1 FROM pedidos p
           WHERE p.cliente_telefone = c.telefone
             AND p.empresa_id = s.empresa_id
-            AND p.created_at >= NOW() - INTERVAL '10 minutes'
+            AND p.created_at >= s.cardapio_enviado_em
         )
     `);
 
