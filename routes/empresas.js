@@ -241,14 +241,71 @@ router.post('/conectar-whatsapp', async (req, res) => {
       return res.status(502).json({ error: 'Falha ao obter access_token da Meta.' });
     }
 
-    // Salva apenas o access_token — phone_number_id e waba_id serão preenchidos manualmente
-    await pool.query(`
-      UPDATE empresas
-      SET whatsapp_access_token = $1
-      WHERE id = $2
-    `, [tokenData.access_token, empresa_id]);
+    const token = tokenData.access_token;
 
-    res.json({ success: true });
+    // Salva o access_token imediatamente
+    await pool.query(
+      'UPDATE empresas SET whatsapp_access_token = $1 WHERE id = $2',
+      [token, empresa_id]
+    );
+
+    // Busca automática de waba_id e phone_number_id
+    let waba_id = null;
+    let phone_number_id = null;
+
+    try {
+      // 1. Obter user_id
+      const meRes = await fetch(`https://graph.facebook.com/v22.0/me?fields=id&access_token=${token}`);
+      const meData = await meRes.json();
+      if (!meData.id) throw new Error('Falha ao obter user_id: ' + JSON.stringify(meData));
+      const user_id = meData.id;
+      console.log(`[WhatsApp] user_id: ${user_id}`);
+
+      // 2. Obter business_id
+      const bizRes = await fetch(`https://graph.facebook.com/v22.0/${user_id}/businesses?access_token=${token}`);
+      const bizData = await bizRes.json();
+      const business_id = bizData.data?.[0]?.id;
+      if (!business_id) throw new Error('Falha ao obter business_id: ' + JSON.stringify(bizData));
+      console.log(`[WhatsApp] business_id: ${business_id}`);
+
+      // 3. Obter waba_id
+      const wabaRes = await fetch(`https://graph.facebook.com/v22.0/${business_id}/owned_whatsapp_business_accounts?access_token=${token}`);
+      const wabaData = await wabaRes.json();
+      waba_id = wabaData.data?.[0]?.id;
+      if (!waba_id) throw new Error('Falha ao obter waba_id: ' + JSON.stringify(wabaData));
+      console.log(`[WhatsApp] waba_id: ${waba_id}`);
+
+      // 4. Obter phone_number_id
+      const phoneRes = await fetch(`https://graph.facebook.com/v22.0/${waba_id}/phone_numbers?access_token=${token}`);
+      const phoneData = await phoneRes.json();
+      phone_number_id = phoneData.data?.[0]?.id;
+      if (!phone_number_id) throw new Error('Falha ao obter phone_number_id: ' + JSON.stringify(phoneData));
+      console.log(`[WhatsApp] phone_number_id: ${phone_number_id}`);
+
+      // 5. Salvar waba_id e phone_number_id
+      await pool.query(
+        'UPDATE empresas SET waba_id = $1, phone_number_id = $2 WHERE id = $3',
+        [waba_id, phone_number_id, empresa_id]
+      );
+      console.log(`[WhatsApp] waba_id e phone_number_id salvos para empresa ${empresa_id}`);
+
+      // 6. Subscrever app ao WABA
+      try {
+        const subRes = await fetch(`https://graph.facebook.com/v22.0/${waba_id}/subscribed_apps`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+        });
+        const subData = await subRes.json();
+        console.log(`[WhatsApp] subscribed_apps:`, subData);
+      } catch (subErr) {
+        console.error('[WhatsApp] Erro ao subscrever app:', subErr.message);
+      }
+
+    } catch (metaErr) {
+      console.error('[WhatsApp] Erro ao buscar dados da Meta:', metaErr.message);
+    }
+
+    res.json({ success: true, waba_id, phone_number_id });
 
   } catch (error) {
     console.error('Erro ao conectar WhatsApp:', error);
