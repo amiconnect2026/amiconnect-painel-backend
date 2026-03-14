@@ -192,7 +192,7 @@ router.post('/cadastrar', async (req, res) => {
 
       await client.query(`
         INSERT INTO usuarios (empresa_id, nome, email, senha_hash, role)
-        VALUES ($1, $2, $3, $4, 'usuario')
+        VALUES ($1, $2, $3, $4, 'gerente')
       `, [empresa_id, nome, email, senhaHash]);
 
       await client.query('COMMIT');
