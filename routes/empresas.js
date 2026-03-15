@@ -218,30 +218,42 @@ router.post('/conectar-whatsapp', async (req, res) => {
 
     const { code, empresa_id } = req.body;
 
-    if (!code || !empresa_id) {
-      return res.status(400).json({ error: 'code e empresa_id são obrigatórios.' });
+    if (!empresa_id) {
+      return res.status(400).json({ error: 'empresa_id é obrigatório.' });
     }
 
-    // Troca o code pelo access_token via servidor
-    const tokenRes = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: '1719530826122495',
-        client_secret: process.env.META_APP_SECRET,
-        code,
-        redirect_uri: ''
-      })
-    });
+    let token;
 
-    const tokenData = await tokenRes.json();
+    if (process.env.META_SYSTEM_TOKEN) {
+      // Usa token fixo de sistema — ignora o code do Embedded Signup
+      token = process.env.META_SYSTEM_TOKEN;
+      console.log('[WhatsApp] Usando META_SYSTEM_TOKEN');
+    } else {
+      // Troca o code pelo access_token via servidor
+      if (!code) {
+        return res.status(400).json({ error: 'code é obrigatório quando META_SYSTEM_TOKEN não está configurado.' });
+      }
 
-    if (!tokenRes.ok || !tokenData.access_token) {
-      console.error('Erro ao trocar code pelo access_token:', tokenData);
-      return res.status(502).json({ error: 'Falha ao obter access_token da Meta.' });
+      const tokenRes = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: '1719530826122495',
+          client_secret: process.env.META_APP_SECRET,
+          code,
+          redirect_uri: ''
+        })
+      });
+
+      const tokenData = await tokenRes.json();
+
+      if (!tokenRes.ok || !tokenData.access_token) {
+        console.error('Erro ao trocar code pelo access_token:', tokenData);
+        return res.status(502).json({ error: 'Falha ao obter access_token da Meta.' });
+      }
+
+      token = tokenData.access_token;
     }
-
-    const token = tokenData.access_token;
 
     // Salva o access_token imediatamente
     await pool.query(
