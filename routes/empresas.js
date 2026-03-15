@@ -216,7 +216,7 @@ router.post('/conectar-whatsapp', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    const { code, empresa_id } = req.body;
+    const { code, empresa_id, usar_token_sistema } = req.body;
 
     if (!empresa_id) {
       return res.status(400).json({ error: 'empresa_id é obrigatório.' });
@@ -224,14 +224,14 @@ router.post('/conectar-whatsapp', async (req, res) => {
 
     let token;
 
-    if (process.env.META_SYSTEM_TOKEN) {
+    if (usar_token_sistema && process.env.META_SYSTEM_TOKEN) {
       // Usa token fixo de sistema — ignora o code do Embedded Signup
       token = process.env.META_SYSTEM_TOKEN;
       console.log('[WhatsApp] Usando META_SYSTEM_TOKEN');
     } else {
       // Troca o code pelo access_token via servidor
       if (!code) {
-        return res.status(400).json({ error: 'code é obrigatório quando META_SYSTEM_TOKEN não está configurado.' });
+        return res.status(400).json({ error: 'code é obrigatório.' });
       }
 
       const tokenRes = await fetch('https://graph.facebook.com/v22.0/oauth/access_token', {
