@@ -212,7 +212,7 @@ router.post('/cadastrar', async (req, res) => {
 // POST /api/empresas/conectar-whatsapp
 router.post('/conectar-whatsapp', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'gerente') {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
