@@ -45,9 +45,16 @@ router.get('/publico/:empresa_id', async (req, res) => {
       ORDER BY c.ordem, p.ordem
     `, [empresa_id]);
 
+    // Buscar faixas de taxa de entrega
+    const taxasResult = await pool.query(
+      'SELECT distancia_ate_km, taxa FROM taxas_entrega WHERE empresa_id = $1 ORDER BY distancia_ate_km ASC',
+      [empresa_id]
+    );
+
     res.json({
       empresa: empresaResult.rows[0],
-      produtos: produtosResult.rows
+      produtos: produtosResult.rows,
+      taxas_entrega: taxasResult.rows
     });
   } catch (error) {
     console.error('Erro ao buscar cardápio público:', error);
