@@ -28,6 +28,7 @@ router.post('/novo-pedido', (req, res) => {
   const io = req.app.get('io');
   if (io) {
     io.to(`empresa_${empresa_id}`).emit('novo_pedido', {
+      pedido_id: req.body.pedido_id || Date.now(),
       cliente_nome, total, empresa_id
     });
   }
