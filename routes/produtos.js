@@ -38,7 +38,10 @@ router.get('/publico/:empresa_id', async (req, res) => {
       SELECT
         p.id, p.nome, p.descricao, p.preco, p.imagem_url, p.disponivel,
         p.destaque, p.tipo_destaque, p.desconto_percent, p.promocao_ativa, p.is_novo,
-        c.nome as categoria_nome, c.ordem as categoria_ordem
+        c.nome as categoria_nome, c.ordem as categoria_ordem,
+        CASE WHEN p.promocao_ativa = true AND p.desconto_percent IS NOT NULL
+             THEN ROUND((p.preco * (1 - p.desconto_percent / 100.0))::numeric, 2)
+             ELSE p.preco END AS preco_final
       FROM produtos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.empresa_id = $1
