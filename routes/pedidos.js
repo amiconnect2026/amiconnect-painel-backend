@@ -28,7 +28,7 @@ router.get('/status-entrega', async (req, res) => {
       JOIN empresas e ON e.id = p.empresa_id
       WHERE p.cliente_telefone = $1
         AND p.empresa_id = $2
-        AND p.status IN ('confirmado', 'entregue')
+        AND p.status IN ('pendente', 'confirmado', 'saiu_entrega', 'entregue')
         AND p.created_at >= NOW() - INTERVAL '3 hours'
       ORDER BY p.created_at DESC
       LIMIT 1
