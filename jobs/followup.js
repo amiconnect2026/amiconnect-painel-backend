@@ -16,7 +16,8 @@ async function runFollowup() {
       JOIN empresas e ON e.id = s.empresa_id
       WHERE s.cardapio_enviado_em IS NOT NULL
         AND s.cardapio_enviado_em < NOW() - INTERVAL '10 minutes'
-        AND s.followup_enviado = false
+        AND s.cardapio_enviado_em >= NOW() - INTERVAL '24 hours'
+        AND (s.followup_enviado_em IS NULL OR s.followup_enviado_em < CURRENT_DATE)
         AND NOT EXISTS (
           SELECT 1 FROM pedidos p
           WHERE p.cliente_telefone = c.telefone
@@ -39,7 +40,7 @@ async function runFollowup() {
         });
 
         await pool.query(
-          'UPDATE sessions SET followup_enviado = true WHERE id = $1',
+          'UPDATE sessions SET followup_enviado_em = NOW() WHERE id = $1',
           [row.id]
         );
 
