@@ -197,8 +197,13 @@ router.post('/', async (req, res) => {
         forma_pagamento,
         troco_para,
         observacoes,
-        status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'confirmado')
+        status,
+        numero_diario
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'confirmado',
+        (SELECT COALESCE(MAX(numero_diario), 0) + 1 FROM pedidos
+         WHERE empresa_id = $1
+           AND DATE(created_at AT TIME ZONE 'America/Sao_Paulo') = DATE(NOW() AT TIME ZONE 'America/Sao_Paulo'))
+      )
       RETURNING *
     `, [
       empresa_id,
