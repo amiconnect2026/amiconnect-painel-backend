@@ -49,7 +49,7 @@ router.get('/faturamento', async (req, res) => {
         COALESCE(AVG(total), 0) AS ticket_medio
       FROM pedidos
       WHERE empresa_id = $1
-        AND status IN ('confirmado', 'entregue')
+        AND status IN ('confirmado', 'entregue', 'saiu_entrega')
         AND ${periodoFiltro}
     `, [empresaId]);
 
@@ -81,7 +81,7 @@ router.get('/itens', async (req, res) => {
       FROM pedidos,
         jsonb_array_elements(itens) AS item
       WHERE empresa_id = $1
-        AND status IN ('confirmado', 'entregue')
+        AND status IN ('confirmado', 'entregue', 'saiu_entrega')
         AND ${periodoFiltro}
       GROUP BY item->>'nome'
       ORDER BY quantidade_total DESC
@@ -113,7 +113,7 @@ router.get('/horario-pico', async (req, res) => {
         COUNT(*)::int AS quantidade_pedidos
       FROM pedidos
       WHERE empresa_id = $1
-        AND status IN ('confirmado', 'entregue')
+        AND status IN ('confirmado', 'entregue', 'saiu_entrega')
         AND ${periodoFiltro}
       GROUP BY hora
       ORDER BY hora
@@ -147,7 +147,7 @@ router.get('/formas-pagamento', async (req, res) => {
           SUM(total) AS total
         FROM pedidos
         WHERE empresa_id = $1
-          AND status IN ('confirmado', 'entregue')
+          AND status IN ('confirmado', 'entregue', 'saiu_entrega')
           AND ${periodoFiltro}
         GROUP BY forma_pagamento
       ),
@@ -191,7 +191,7 @@ router.get('/clientes', async (req, res) => {
         SUM(total) AS total_gasto
       FROM pedidos
       WHERE empresa_id = $1
-        AND status IN ('confirmado', 'entregue')
+        AND status IN ('confirmado', 'entregue', 'saiu_entrega')
         AND ${periodoFiltro}
       GROUP BY cliente_telefone
       ORDER BY total_gasto DESC
