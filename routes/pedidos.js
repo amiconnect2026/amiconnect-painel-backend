@@ -318,8 +318,8 @@ router.post('/manual', async (req, res) => {
 
     res.status(201).json({ success: true, pedido });
   } catch (error) {
-    console.error('Erro ao criar pedido manual:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao criar pedido manual:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
