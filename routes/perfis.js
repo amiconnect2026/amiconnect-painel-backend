@@ -123,7 +123,7 @@ router.use(authenticateToken);
 router.get('/buscar', async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q || q.length < 2) return res.json({ perfis: [] });
+    if (!q || q.length < 1) return res.json({ perfis: [] });
 
     const result = await pool.query(`
       SELECT
