@@ -266,6 +266,63 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ==========================================
+// POST /api/pedidos/manual - Criar pedido manual pelo painel (autenticado)
+// ==========================================
+router.post('/manual', async (req, res) => {
+  try {
+    const {
+      cliente_telefone, cliente_nome, cliente_endereco, cliente_bairro,
+      itens, subtotal, taxa_entrega, desconto, total,
+      forma_pagamento, troco_para, observacoes, retirada
+    } = req.body;
+
+    const empresaId = req.user.role === 'admin'
+      ? req.body.empresa_id
+      : req.user.empresa_id;
+
+    if (!empresaId) return res.status(400).json({ error: 'empresa_id é obrigatório.' });
+    if (!cliente_telefone || !itens || !total) {
+      return res.status(400).json({ error: 'cliente_telefone, itens e total são obrigatórios.' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO pedidos (
+        empresa_id, cliente_telefone, cliente_nome, cliente_endereco, cliente_bairro,
+        itens, subtotal, taxa_entrega, desconto, total,
+        forma_pagamento, troco_para, observacoes, status, retirada,
+        numero_diario
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'pendente', $14,
+        (SELECT COALESCE(MAX(numero_diario), 0) + 1 FROM pedidos
+         WHERE empresa_id = $1
+           AND DATE(created_at AT TIME ZONE 'America/Sao_Paulo') = DATE(NOW() AT TIME ZONE 'America/Sao_Paulo'))
+      )
+      RETURNING *
+    `, [
+      empresaId, cliente_telefone, cliente_nome, cliente_endereco, cliente_bairro,
+      JSON.stringify(itens), subtotal || 0, taxa_entrega || 0, desconto || 0, total,
+      forma_pagamento, troco_para, observacoes, retirada || false
+    ]);
+
+    const pedido = result.rows[0];
+
+    // Emitir socket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`empresa_${empresaId}`).emit('novo_pedido', {
+        pedido_id: pedido.id,
+        cliente_nome: cliente_nome || cliente_telefone,
+        total
+      });
+    }
+
+    res.status(201).json({ success: true, pedido });
+  } catch (error) {
+    console.error('Erro ao criar pedido manual:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
 // PATCH /api/pedidos/:id/status - Atualizar status
 router.patch('/:id/status', async (req, res) => {
   try {
