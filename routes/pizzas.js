@@ -28,7 +28,7 @@ router.get('/publico/:empresa_id', async (req, res) => {
     const { empresa_id } = req.params;
 
     const [tamanhos, subcategorias, bordas, configs] = await Promise.all([
-      pool.query('SELECT * FROM produto_tamanhos WHERE empresa_id = $1 ORDER BY id', [empresa_id]),
+      pool.query('SELECT * FROM produto_tamanhos WHERE empresa_id = $1 AND produto_id IS NULL ORDER BY ordem', [empresa_id]),
       pool.query('SELECT * FROM pizza_subcategorias WHERE empresa_id = $1 ORDER BY id', [empresa_id]),
       pool.query('SELECT * FROM pizza_bordas WHERE empresa_id = $1 AND disponivel = true ORDER BY id', [empresa_id]),
       pool.query(
@@ -69,7 +69,7 @@ router.get('/publico/:empresa_id', async (req, res) => {
 router.get('/tamanhos', async (req, res) => {
   try {
     const empresaId = getEmpresaId(req);
-    const result = await pool.query('SELECT * FROM produto_tamanhos WHERE empresa_id = $1 ORDER BY id', [empresaId]);
+    const result = await pool.query('SELECT * FROM produto_tamanhos WHERE empresa_id = $1 AND produto_id IS NULL ORDER BY ordem', [empresaId]);
     res.json({ tamanhos: result.rows });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -79,10 +79,10 @@ router.get('/tamanhos', async (req, res) => {
 router.post('/tamanhos', async (req, res) => {
   try {
     const empresaId = getEmpresaId(req);
-    const { nome, preco, max_sabores } = req.body;
+    const { nome, preco, max_sabores, ordem } = req.body;
     const result = await pool.query(
-      'INSERT INTO produto_tamanhos (empresa_id, nome, preco, max_sabores) VALUES ($1, $2, $3, $4) RETURNING *',
-      [empresaId, nome, preco, max_sabores || 1]
+      'INSERT INTO produto_tamanhos (empresa_id, nome, max_sabores, preco, disponivel, ordem) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [empresaId, nome, max_sabores || 1, preco, true, ordem || 0]
     );
     res.status(201).json({ success: true, tamanho: result.rows[0] });
   } catch (error) {
