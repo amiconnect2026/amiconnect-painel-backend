@@ -120,16 +120,20 @@ router.patch('/:telefone/liberar', async (req, res) => {
       RETURNING *
     `, [telefone, empresaId]);
 
-    // Voltar status para ativo na tabela sessions
-    await pool.query(`
-      UPDATE sessions 
-      SET status = 'ativo'
-      WHERE empresa_id = $1 
-        AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2)
-    `, [empresaId, telefone]);
+    // Voltar status para ativo na tabela sessions (não crítico)
+    try {
+      await pool.query(`
+        UPDATE sessions
+        SET status = 'ativo'
+        WHERE empresa_id = $1
+          AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2)
+      `, [empresaId, telefone]);
+    } catch (sessErr) {
+      console.warn('Aviso: não foi possível atualizar sessions:', sessErr.message);
+    }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       conversa: result.rows[0],
       message: 'Conversa liberada para o bot!'
     });
