@@ -294,7 +294,7 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
     );
 
     const gruposRes = await pool.query(
-      'SELECT id, nome, obrigatorio, min_opcoes, max_opcoes, ordem FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [produto_id]
     );
 
@@ -339,7 +339,7 @@ router.get('/:id/complementos', async (req, res) => {
     );
 
     const gruposRes = await pool.query(
-      'SELECT * FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [id]
     );
 
@@ -416,7 +416,7 @@ router.delete('/tamanhos/:id', async (req, res) => {
 router.get('/:id/grupos', async (req, res) => {
   try {
     const gruposRes = await pool.query(
-      'SELECT * FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [req.params.id]
     );
     const grupos = gruposRes.rows;
@@ -435,25 +435,25 @@ router.get('/:id/grupos', async (req, res) => {
 
 router.post('/:id/grupos', async (req, res) => {
   try {
-    const { nome, obrigatorio, min_opcoes, max_opcoes, ordem } = req.body;
+    const { nome, tipo, min_escolhas, max_escolhas } = req.body;
     const result = await pool.query(
-      'INSERT INTO produto_grupos (produto_id, nome, obrigatorio, min_opcoes, max_opcoes, ordem) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.params.id, nome, obrigatorio || false, min_opcoes || 0, max_opcoes || 1, ordem || 0]
+      'INSERT INTO produto_grupos (produto_id, nome, tipo, min_escolhas, max_escolhas) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.params.id, nome, tipo || 'adicional', min_escolhas ?? 0, max_escolhas ?? 1]
     );
     result.rows[0].opcoes = [];
     res.status(201).json({ success: true, grupo: result.rows[0] });
   } catch (error) {
     console.error('Erro ao criar grupo:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
 router.put('/grupos/:id', async (req, res) => {
   try {
-    const { nome, obrigatorio, min_opcoes, max_opcoes, ordem } = req.body;
+    const { nome, tipo, min_escolhas, max_escolhas } = req.body;
     const result = await pool.query(
-      'UPDATE produto_grupos SET nome = $1, obrigatorio = $2, min_opcoes = $3, max_opcoes = $4, ordem = $5 WHERE id = $6 RETURNING *',
-      [nome, obrigatorio || false, min_opcoes || 0, max_opcoes || 1, ordem || 0, req.params.id]
+      'UPDATE produto_grupos SET nome = $1, tipo = $2, min_escolhas = $3, max_escolhas = $4 WHERE id = $5 RETURNING *',
+      [nome, tipo || 'adicional', min_escolhas ?? 0, max_escolhas ?? 1, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Grupo não encontrado.' });
     res.json({ success: true, grupo: result.rows[0] });
