@@ -325,7 +325,7 @@ router.get('/:id/complementos', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const produtoRes = await pool.query('SELECT id, nome, tipo, preco FROM produtos WHERE id = $1', [id]);
+    const produtoRes = await pool.query('SELECT id, nome, tipo, preco, empresa_id FROM produtos WHERE id = $1', [id]);
     if (produtoRes.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
 
     const produto = produtoRes.rows[0];
