@@ -41,7 +41,6 @@ const empresasRoutes = require('./routes/empresas');
 const socketRoutes = require('./routes/socket');
 const relatoriosRoutes = require('./routes/relatorios');
 const perfisRoutes = require('./routes/perfis');
-const bibliotecaRoutes = require('./routes/biblioteca');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/produtos', produtosRoutes);
@@ -53,7 +52,6 @@ app.use('/api/empresas', empresasRoutes);
 app.use('/api/socket', socketRoutes);
 app.use('/api/relatorios', relatoriosRoutes);
 app.use('/api/perfis', perfisRoutes);
-app.use('/api/biblioteca', bibliotecaRoutes);
 
 // Socket.io - conexões
 io.on('connection', (socket) => {

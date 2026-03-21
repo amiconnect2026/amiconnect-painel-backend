@@ -473,6 +473,38 @@ router.delete('/grupos/:id', async (req, res) => {
 });
 
 // ==========================================
+// POST /grupos/bulk — Adicionar grupo+opções a múltiplos produtos
+// ==========================================
+router.post('/grupos/bulk', async (req, res) => {
+  try {
+    const { produto_ids, grupo } = req.body;
+    if (!produto_ids?.length || !grupo?.nome) {
+      return res.status(400).json({ error: 'produto_ids e grupo.nome são obrigatórios.' });
+    }
+    const { nome, tipo, min_escolhas, max_escolhas, opcoes = [] } = grupo;
+
+    for (const produtoId of produto_ids) {
+      const novoGrupo = await pool.query(
+        'INSERT INTO produto_grupos (produto_id, nome, tipo, min_escolhas, max_escolhas) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+        [produtoId, nome, tipo || 'adicional', min_escolhas ?? 0, max_escolhas ?? 1]
+      );
+      const novoGrupoId = novoGrupo.rows[0].id;
+      for (const opcao of opcoes) {
+        await pool.query(
+          'INSERT INTO produto_opcoes (grupo_id, nome, preco_adicional, disponivel) VALUES ($1, $2, $3, $4)',
+          [novoGrupoId, opcao.nome, opcao.preco_adicional || 0, true]
+        );
+      }
+    }
+
+    res.json({ success: true, aplicados: produto_ids.length });
+  } catch (error) {
+    console.error('Erro ao adicionar complemento em bulk:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
 // Opções CRUD
 // ==========================================
 router.post('/grupos/:id/opcoes', async (req, res) => {
