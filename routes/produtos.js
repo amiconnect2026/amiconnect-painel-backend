@@ -289,10 +289,16 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
       return res.status(404).json({ error: 'Produto não encontrado.' });
     }
 
-    const tamanhoRes = await pool.query(
-      'SELECT id, nome, preco, ordem FROM produto_tamanhos WHERE produto_id = $1 AND ativo = true ORDER BY ordem, id',
-      [produto_id]
-    );
+    let tamanhos = [];
+    try {
+      const tamanhoRes = await pool.query(
+        'SELECT id, nome, preco FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
+        [produto_id]
+      );
+      tamanhos = tamanhoRes.rows;
+    } catch (e) {
+      console.error('Erro ao buscar tamanhos (tabela pode não existir):', e.message);
+    }
 
     const gruposRes = await pool.query(
       'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
@@ -302,7 +308,7 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
     const grupos = gruposRes.rows;
     for (const grupo of grupos) {
       const opcoesRes = await pool.query(
-        'SELECT id, nome, preco_adicional, disponivel, ordem FROM produto_opcoes WHERE grupo_id = $1 AND disponivel = true ORDER BY ordem, id',
+        'SELECT id, nome, preco_adicional, disponivel FROM produto_opcoes WHERE grupo_id = $1 AND disponivel = true ORDER BY id',
         [grupo.id]
       );
       grupo.opcoes = opcoesRes.rows;
@@ -310,12 +316,12 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
 
     res.json({
       produto: produtoRes.rows[0],
-      tamanhos: tamanhoRes.rows,
+      tamanhos,
       grupos
     });
   } catch (error) {
     console.error('Erro ao buscar complementos públicos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -335,7 +341,7 @@ router.get('/:id/complementos', async (req, res) => {
     }
 
     const tamanhoRes = await pool.query(
-      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY ordem, id',
+      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
       [id]
     );
 
@@ -347,7 +353,7 @@ router.get('/:id/complementos', async (req, res) => {
     const grupos = gruposRes.rows;
     for (const grupo of grupos) {
       const opcoesRes = await pool.query(
-        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY ordem, id',
+        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY id',
         [grupo.id]
       );
       grupo.opcoes = opcoesRes.rows;
@@ -366,7 +372,7 @@ router.get('/:id/complementos', async (req, res) => {
 router.get('/:id/tamanhos', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY ordem, id',
+      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
       [req.params.id]
     );
     res.json({ tamanhos: result.rows });
@@ -423,7 +429,7 @@ router.get('/:id/grupos', async (req, res) => {
     const grupos = gruposRes.rows;
     for (const grupo of grupos) {
       const opcoesRes = await pool.query(
-        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY ordem, id',
+        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY id',
         [grupo.id]
       );
       grupo.opcoes = opcoesRes.rows;
