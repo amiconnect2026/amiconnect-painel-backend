@@ -383,28 +383,30 @@ router.get('/:id/tamanhos', async (req, res) => {
 
 router.post('/:id/tamanhos', async (req, res) => {
   try {
-    const { nome, preco, ativo, ordem } = req.body;
+    const { nome, preco, ativo } = req.body;
     const result = await pool.query(
-      'INSERT INTO produto_tamanhos (produto_id, nome, preco, ativo, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [req.params.id, nome, preco || 0, ativo !== false, ordem || 0]
+      'INSERT INTO produto_tamanhos (produto_id, nome, preco, ativo) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.params.id, nome, preco || 0, ativo !== false]
     );
     res.status(201).json({ success: true, tamanho: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao criar tamanho:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 router.put('/tamanhos/:id', async (req, res) => {
   try {
-    const { nome, preco, ativo, ordem } = req.body;
+    const { nome, preco, ativo } = req.body;
     const result = await pool.query(
-      'UPDATE produto_tamanhos SET nome = $1, preco = $2, ativo = $3, ordem = $4 WHERE id = $5 RETURNING *',
-      [nome, preco, ativo, ordem || 0, req.params.id]
+      'UPDATE produto_tamanhos SET nome = $1, preco = $2, ativo = $3 WHERE id = $4 RETURNING *',
+      [nome, preco, ativo, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tamanho não encontrado.' });
     res.json({ success: true, tamanho: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao atualizar tamanho:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -515,28 +517,30 @@ router.post('/grupos/bulk', async (req, res) => {
 // ==========================================
 router.post('/grupos/:id/opcoes', async (req, res) => {
   try {
-    const { nome, preco_adicional, disponivel, ordem } = req.body;
+    const { nome, preco_adicional, disponivel } = req.body;
     const result = await pool.query(
-      'INSERT INTO produto_opcoes (grupo_id, nome, preco_adicional, disponivel, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [req.params.id, nome, preco_adicional || 0, disponivel !== false, ordem || 0]
+      'INSERT INTO produto_opcoes (grupo_id, nome, preco_adicional, disponivel) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.params.id, nome, preco_adicional || 0, disponivel !== false]
     );
     res.status(201).json({ success: true, opcao: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao criar opção:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 router.put('/opcoes/:id', async (req, res) => {
   try {
-    const { nome, preco_adicional, disponivel, ordem } = req.body;
+    const { nome, preco_adicional, disponivel } = req.body;
     const result = await pool.query(
-      'UPDATE produto_opcoes SET nome = $1, preco_adicional = $2, disponivel = $3, ordem = $4 WHERE id = $5 RETURNING *',
-      [nome, preco_adicional || 0, disponivel !== false, ordem || 0, req.params.id]
+      'UPDATE produto_opcoes SET nome = $1, preco_adicional = $2, disponivel = $3 WHERE id = $4 RETURNING *',
+      [nome, preco_adicional || 0, disponivel !== false, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Opção não encontrada.' });
     res.json({ success: true, opcao: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao atualizar opção:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
