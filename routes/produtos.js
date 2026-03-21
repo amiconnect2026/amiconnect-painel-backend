@@ -289,17 +289,6 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
       return res.status(404).json({ error: 'Produto não encontrado.' });
     }
 
-    let tamanhos = [];
-    try {
-      const tamanhoRes = await pool.query(
-        'SELECT id, nome, preco FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
-        [produto_id]
-      );
-      tamanhos = tamanhoRes.rows;
-    } catch (e) {
-      console.error('Erro ao buscar tamanhos (tabela pode não existir):', e.message);
-    }
-
     const gruposRes = await pool.query(
       'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [produto_id]
@@ -314,11 +303,7 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
       grupo.opcoes = opcoesRes.rows;
     }
 
-    res.json({
-      produto: produtoRes.rows[0],
-      tamanhos,
-      grupos
-    });
+    res.json({ produto: produtoRes.rows[0], grupos });
   } catch (error) {
     console.error('Erro ao buscar complementos públicos:', error);
     res.status(500).json({ error: error.message });
@@ -340,11 +325,6 @@ router.get('/:id/complementos', async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    const tamanhoRes = await pool.query(
-      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
-      [id]
-    );
-
     const gruposRes = await pool.query(
       'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [id]
@@ -359,62 +339,9 @@ router.get('/:id/complementos', async (req, res) => {
       grupo.opcoes = opcoesRes.rows;
     }
 
-    res.json({ produto: produtoRes.rows[0], tamanhos: tamanhoRes.rows, grupos });
+    res.json({ produto: produtoRes.rows[0], grupos });
   } catch (error) {
     console.error('Erro ao buscar complementos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  }
-});
-
-// ==========================================
-// Tamanhos CRUD
-// ==========================================
-router.get('/:id/tamanhos', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY id',
-      [req.params.id]
-    );
-    res.json({ tamanhos: result.rows });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  }
-});
-
-router.post('/:id/tamanhos', async (req, res) => {
-  try {
-    const { nome, preco, ativo } = req.body;
-    const result = await pool.query(
-      'INSERT INTO produto_tamanhos (produto_id, nome, preco, ativo) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.params.id, nome, preco || 0, ativo !== false]
-    );
-    res.status(201).json({ success: true, tamanho: result.rows[0] });
-  } catch (error) {
-    console.error('Erro ao criar tamanho:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.put('/tamanhos/:id', async (req, res) => {
-  try {
-    const { nome, preco, ativo } = req.body;
-    const result = await pool.query(
-      'UPDATE produto_tamanhos SET nome = $1, preco = $2, ativo = $3 WHERE id = $4 RETURNING *',
-      [nome, preco, ativo, req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Tamanho não encontrado.' });
-    res.json({ success: true, tamanho: result.rows[0] });
-  } catch (error) {
-    console.error('Erro ao atualizar tamanho:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.delete('/tamanhos/:id', async (req, res) => {
-  try {
-    await pool.query('DELETE FROM produto_tamanhos WHERE id = $1', [req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
