@@ -124,7 +124,7 @@ router.get('/:id', async (req, res) => {
 // ==========================================
 router.post('/', upload.single('imagem'), async (req, res) => {
   try {
-    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo } = req.body;
+    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo, tipo } = req.body;
 
     if (!nome || !preco) {
       return res.status(400).json({ error: 'Nome e preço são obrigatórios.' });
@@ -146,13 +146,13 @@ router.post('/', upload.single('imagem'), async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO produtos (empresa_id, categoria_id, nome, descricao, preco, disponivel, ordem, imagem_url, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO produtos (empresa_id, categoria_id, nome, descricao, preco, disponivel, ordem, imagem_url, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo, tipo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [empresaId, categoria_id, nome, descricao, preco, disponivel !== false, ordem || 0, imagemUrl,
        destaque === 'true', tipo_destaque || null,
        desconto_percent !== '' && desconto_percent != null ? parseFloat(desconto_percent) : null,
-       promocao_ativa === 'true', is_novo === 'true']
+       promocao_ativa === 'true', is_novo === 'true', tipo || 'simples']
     );
 
     res.status(201).json({ success: true, produto: result.rows[0] });
@@ -168,7 +168,7 @@ router.post('/', upload.single('imagem'), async (req, res) => {
 router.put('/:id', upload.single('imagem'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo, remover_imagem } = req.body;
+    const { categoria_id, nome, descricao, preco, disponivel, ordem, destaque, tipo_destaque, desconto_percent, promocao_ativa, is_novo, remover_imagem, tipo } = req.body;
 
     const checkResult = await pool.query('SELECT * FROM produtos WHERE id = $1', [id]);
 
@@ -196,13 +196,14 @@ router.put('/:id', upload.single('imagem'), async (req, res) => {
       `UPDATE produtos
        SET categoria_id = $1, nome = $2, descricao = $3, preco = $4,
            disponivel = $5, ordem = $6, imagem_url = $7, updated_at = NOW(),
-           destaque = $8, tipo_destaque = $9, desconto_percent = $10, promocao_ativa = $11, is_novo = $12
-       WHERE id = $13
+           destaque = $8, tipo_destaque = $9, desconto_percent = $10, promocao_ativa = $11, is_novo = $12,
+           tipo = $13
+       WHERE id = $14
        RETURNING *`,
       [categoria_id, nome, descricao, preco, disponivel, ordem, imagemUrl,
        destaque === 'true', tipo_destaque || null,
        desconto_percent !== '' && desconto_percent != null ? parseFloat(desconto_percent) : null,
-       promocao_ativa === 'true', is_novo === 'true', id]
+       promocao_ativa === 'true', is_novo === 'true', tipo || 'simples', id]
     );
 
     res.json({ success: true, produto: result.rows[0] });
@@ -268,6 +269,242 @@ router.delete('/:id', async (req, res) => {
     res.json({ success: true, message: 'Produto deletado com sucesso.' });
   } catch (error) {
     console.error('Erro ao deletar produto:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
+// GET /api/produtos/publico/:produto_id/complementos - Complementos públicos (sem auth)
+// ==========================================
+router.get('/publico/:produto_id/complementos', async (req, res) => {
+  try {
+    const { produto_id } = req.params;
+
+    const produtoRes = await pool.query(
+      'SELECT id, nome, tipo, preco FROM produtos WHERE id = $1 AND disponivel = true',
+      [produto_id]
+    );
+    if (produtoRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Produto não encontrado.' });
+    }
+
+    const tamanhoRes = await pool.query(
+      'SELECT id, nome, preco, ordem FROM produto_tamanhos WHERE produto_id = $1 AND ativo = true ORDER BY ordem, id',
+      [produto_id]
+    );
+
+    const gruposRes = await pool.query(
+      'SELECT id, nome, obrigatorio, min_opcoes, max_opcoes, ordem FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      [produto_id]
+    );
+
+    const grupos = gruposRes.rows;
+    for (const grupo of grupos) {
+      const opcoesRes = await pool.query(
+        'SELECT id, nome, preco_adicional, disponivel, ordem FROM produto_opcoes WHERE grupo_id = $1 AND disponivel = true ORDER BY ordem, id',
+        [grupo.id]
+      );
+      grupo.opcoes = opcoesRes.rows;
+    }
+
+    res.json({
+      produto: produtoRes.rows[0],
+      tamanhos: tamanhoRes.rows,
+      grupos
+    });
+  } catch (error) {
+    console.error('Erro ao buscar complementos públicos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
+// GET /api/produtos/:id/complementos - Complementos (autenticado)
+// ==========================================
+router.get('/:id/complementos', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const produtoRes = await pool.query('SELECT id, nome, tipo, preco FROM produtos WHERE id = $1', [id]);
+    if (produtoRes.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
+
+    const produto = produtoRes.rows[0];
+    if (req.user.role !== 'admin' && produto.empresa_id !== req.user.empresa_id) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const tamanhoRes = await pool.query(
+      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY ordem, id',
+      [id]
+    );
+
+    const gruposRes = await pool.query(
+      'SELECT * FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      [id]
+    );
+
+    const grupos = gruposRes.rows;
+    for (const grupo of grupos) {
+      const opcoesRes = await pool.query(
+        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY ordem, id',
+        [grupo.id]
+      );
+      grupo.opcoes = opcoesRes.rows;
+    }
+
+    res.json({ produto: produtoRes.rows[0], tamanhos: tamanhoRes.rows, grupos });
+  } catch (error) {
+    console.error('Erro ao buscar complementos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
+// Tamanhos CRUD
+// ==========================================
+router.get('/:id/tamanhos', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM produto_tamanhos WHERE produto_id = $1 ORDER BY ordem, id',
+      [req.params.id]
+    );
+    res.json({ tamanhos: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.post('/:id/tamanhos', async (req, res) => {
+  try {
+    const { nome, preco, ativo, ordem } = req.body;
+    const result = await pool.query(
+      'INSERT INTO produto_tamanhos (produto_id, nome, preco, ativo, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.params.id, nome, preco || 0, ativo !== false, ordem || 0]
+    );
+    res.status(201).json({ success: true, tamanho: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.put('/tamanhos/:id', async (req, res) => {
+  try {
+    const { nome, preco, ativo, ordem } = req.body;
+    const result = await pool.query(
+      'UPDATE produto_tamanhos SET nome = $1, preco = $2, ativo = $3, ordem = $4 WHERE id = $5 RETURNING *',
+      [nome, preco, ativo, ordem || 0, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Tamanho não encontrado.' });
+    res.json({ success: true, tamanho: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.delete('/tamanhos/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produto_tamanhos WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
+// Grupos CRUD
+// ==========================================
+router.get('/:id/grupos', async (req, res) => {
+  try {
+    const gruposRes = await pool.query(
+      'SELECT * FROM produto_grupos WHERE produto_id = $1 ORDER BY ordem, id',
+      [req.params.id]
+    );
+    const grupos = gruposRes.rows;
+    for (const grupo of grupos) {
+      const opcoesRes = await pool.query(
+        'SELECT * FROM produto_opcoes WHERE grupo_id = $1 ORDER BY ordem, id',
+        [grupo.id]
+      );
+      grupo.opcoes = opcoesRes.rows;
+    }
+    res.json({ grupos });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.post('/:id/grupos', async (req, res) => {
+  try {
+    const { nome, obrigatorio, min_opcoes, max_opcoes, ordem } = req.body;
+    const result = await pool.query(
+      'INSERT INTO produto_grupos (produto_id, nome, obrigatorio, min_opcoes, max_opcoes, ordem) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [req.params.id, nome, obrigatorio || false, min_opcoes || 0, max_opcoes || 1, ordem || 0]
+    );
+    result.rows[0].opcoes = [];
+    res.status(201).json({ success: true, grupo: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.put('/grupos/:id', async (req, res) => {
+  try {
+    const { nome, obrigatorio, min_opcoes, max_opcoes, ordem } = req.body;
+    const result = await pool.query(
+      'UPDATE produto_grupos SET nome = $1, obrigatorio = $2, min_opcoes = $3, max_opcoes = $4, ordem = $5 WHERE id = $6 RETURNING *',
+      [nome, obrigatorio || false, min_opcoes || 0, max_opcoes || 1, ordem || 0, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Grupo não encontrado.' });
+    res.json({ success: true, grupo: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.delete('/grupos/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produto_grupos WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
+// Opções CRUD
+// ==========================================
+router.post('/grupos/:id/opcoes', async (req, res) => {
+  try {
+    const { nome, preco_adicional, disponivel, ordem } = req.body;
+    const result = await pool.query(
+      'INSERT INTO produto_opcoes (grupo_id, nome, preco_adicional, disponivel, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.params.id, nome, preco_adicional || 0, disponivel !== false, ordem || 0]
+    );
+    res.status(201).json({ success: true, opcao: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.put('/opcoes/:id', async (req, res) => {
+  try {
+    const { nome, preco_adicional, disponivel, ordem } = req.body;
+    const result = await pool.query(
+      'UPDATE produto_opcoes SET nome = $1, preco_adicional = $2, disponivel = $3, ordem = $4 WHERE id = $5 RETURNING *',
+      [nome, preco_adicional || 0, disponivel !== false, ordem || 0, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Opção não encontrada.' });
+    res.json({ success: true, opcao: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.delete('/opcoes/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produto_opcoes WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
