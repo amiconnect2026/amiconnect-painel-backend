@@ -443,7 +443,8 @@ router.post('/:id/grupos', async (req, res) => {
     result.rows[0].opcoes = [];
     res.status(201).json({ success: true, grupo: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    console.error('Erro ao criar grupo:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
