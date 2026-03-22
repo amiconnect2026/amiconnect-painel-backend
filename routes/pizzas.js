@@ -57,11 +57,27 @@ router.get('/publico/:empresa_id', async (req, res) => {
     const configsMap = {};
     configs.rows.forEach(c => { configsMap[c.produto_id] = c.tem_borda; });
 
+    // Combos
+    const combosRes = await pool.query(
+      `SELECT p.id, p.nome, p.descricao, p.preco, p.imagem_url, p.disponivel, p.combo_num_pizzas
+       FROM produtos p WHERE p.empresa_id = $1 AND p.tipo = 'combo' AND (p.disponivel IS NULL OR p.disponivel != false)`,
+      [empresa_id]
+    );
+    const combosWithSabores = await Promise.all(combosRes.rows.map(async c => {
+      const sRes = await pool.query(
+        `SELECT ps.id, ps.nome, ps.descricao, ps.preco_adicional, ps.subcategoria_id
+         FROM pizza_sabores ps JOIN combo_sabores cs ON ps.id = cs.sabor_id
+         WHERE cs.produto_id = $1 AND ps.disponivel = true`, [c.id]
+      );
+      return { ...c, sabores_permitidos: sRes.rows };
+    }));
+
     res.json({
       tamanhos: tamanhos.rows,
       subcategorias: subcatsWithSabores,
       bordas: bordas.rows,
-      configs: configsMap
+      configs: configsMap,
+      combos: combosWithSabores
     });
   } catch (error) {
     console.error('Erro ao buscar dados pizza público:', error);
@@ -343,6 +359,25 @@ router.put('/config/:produto_id', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// COMBO SABORES
+router.get('/combo-sabores/:produto_id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT sabor_id FROM combo_sabores WHERE produto_id = $1', [req.params.produto_id]);
+    res.json({ sabor_ids: result.rows.map(r => r.sabor_id) });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+router.post('/combo-sabores/:produto_id', async (req, res) => {
+  try {
+    const { sabor_ids = [] } = req.body;
+    await pool.query('DELETE FROM combo_sabores WHERE produto_id = $1', [req.params.produto_id]);
+    for (const sid of sabor_ids) {
+      await pool.query('INSERT INTO combo_sabores (produto_id, sabor_id) VALUES ($1, $2)', [req.params.produto_id, sid]);
+    }
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 module.exports = router;
