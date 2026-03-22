@@ -39,11 +39,17 @@ router.get('/publico/:empresa_id', async (req, res) => {
 
     const subcatsWithSabores = await Promise.all(
       subcategorias.rows.map(async (sc) => {
-        const sabores = await pool.query(
+        const saboresRes = await pool.query(
           'SELECT * FROM pizza_sabores WHERE subcategoria_id = $1 AND disponivel = true ORDER BY id',
           [sc.id]
         );
-        return { ...sc, sabores: sabores.rows };
+        const saboresWithPrecos = await Promise.all(
+          saboresRes.rows.map(async (s) => {
+            const precos = await pool.query('SELECT * FROM pizza_sabor_precos WHERE sabor_id = $1', [s.id]);
+            return { ...s, precos: precos.rows };
+          })
+        );
+        return { ...sc, sabores: saboresWithPrecos };
       })
     );
 
@@ -266,6 +272,40 @@ router.delete('/bordas/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM pizza_bordas WHERE id = $1', [req.params.id]);
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// SABOR PRECOS (pizza_sabor_precos)
+// ==========================================
+router.get('/sabores/:id/precos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM pizza_sabor_precos WHERE sabor_id = $1', [req.params.id]);
+    res.json({ precos: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/sabores/:id/precos', async (req, res) => {
+  try {
+    const saborId = req.params.id;
+    const { precos } = req.body; // [{ tamanho_id, preco_adicional }]
+    await pool.query('DELETE FROM pizza_sabor_precos WHERE sabor_id = $1', [saborId]);
+    if (precos && precos.length > 0) {
+      for (const p of precos) {
+        if (p.preco_adicional !== null && p.preco_adicional !== undefined) {
+          await pool.query(
+            'INSERT INTO pizza_sabor_precos (sabor_id, tamanho_id, preco_adicional) VALUES ($1, $2, $3)',
+            [saborId, p.tamanho_id, p.preco_adicional]
+          );
+        }
+      }
+    }
+    const result = await pool.query('SELECT * FROM pizza_sabor_precos WHERE sabor_id = $1', [saborId]);
+    res.json({ success: true, precos: result.rows });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
