@@ -25,7 +25,7 @@ router.get('/publico/:empresa_id', async (req, res) => {
 
     // Buscar dados da empresa
     const empresaResult = await pool.query(
-      'SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo, tempo_entrega_min, tempo_entrega_max, whatsapp, foto_capa, permite_retirada FROM empresas WHERE id = $1',
+      'SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo, tempo_entrega_min, tempo_entrega_max, whatsapp, foto_capa, permite_retirada, tipo_negocio FROM empresas WHERE id = $1',
       [empresa_id]
     );
 
