@@ -101,10 +101,10 @@ router.get('/tamanhos', async (req, res) => {
 router.post('/tamanhos', async (req, res) => {
   try {
     const empresaId = getEmpresaId(req);
-    const { nome, preco, max_sabores, ordem } = req.body;
+    const { nome, preco, max_sabores, pedacos, ordem } = req.body;
     const result = await pool.query(
-      'INSERT INTO produto_tamanhos (empresa_id, nome, max_sabores, preco, disponivel, ordem) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [empresaId, nome, max_sabores || 1, preco, true, ordem || 0]
+      'INSERT INTO produto_tamanhos (empresa_id, nome, max_sabores, preco, pedacos, disponivel, ordem) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [empresaId, nome, max_sabores || 1, preco, pedacos || null, true, ordem || 0]
     );
     res.status(201).json({ success: true, tamanho: result.rows[0] });
   } catch (error) {
@@ -114,10 +114,10 @@ router.post('/tamanhos', async (req, res) => {
 
 router.put('/tamanhos/:id', async (req, res) => {
   try {
-    const { nome, preco, max_sabores } = req.body;
+    const { nome, preco, max_sabores, pedacos } = req.body;
     const result = await pool.query(
-      'UPDATE produto_tamanhos SET nome = $1, preco = $2, max_sabores = $3 WHERE id = $4 RETURNING *',
-      [nome, preco, max_sabores || 1, req.params.id]
+      'UPDATE produto_tamanhos SET nome = $1, preco = $2, max_sabores = $3, pedacos = $4 WHERE id = $5 RETURNING *',
+      [nome, preco, max_sabores || 1, pedacos || null, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tamanho não encontrado.' });
     res.json({ success: true, tamanho: result.rows[0] });

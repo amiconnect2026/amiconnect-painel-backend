@@ -57,6 +57,7 @@ async function runMigrations() {
       )
     `);
     await pool.query(`ALTER TABLE pizza_sabores ADD COLUMN IF NOT EXISTS produto_id INTEGER REFERENCES produtos(id) ON DELETE SET NULL`);
+    await pool.query(`ALTER TABLE produto_tamanhos ADD COLUMN IF NOT EXISTS pedacos INTEGER`);
     console.log('✅ Migrations aplicadas');
   } catch (e) {
     console.error('❌ Erro nas migrations:', e.message);
