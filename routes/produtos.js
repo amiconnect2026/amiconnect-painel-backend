@@ -237,6 +237,11 @@ router.patch('/:id/toggle', async (req, res) => {
       [id]
     );
 
+    // Sync to pizza_sabores if pizza product
+    if (result.rows[0].tipo === 'pizza') {
+      await pool.query('UPDATE pizza_sabores SET disponivel = $1 WHERE produto_id = $2', [result.rows[0].disponivel, result.rows[0].id]);
+    }
+
     res.json({ success: true, produto: result.rows[0] });
   } catch (error) {
     console.error('Erro ao alternar disponibilidade:', error);

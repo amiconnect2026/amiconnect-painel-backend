@@ -214,7 +214,41 @@ router.post('/sabores', async (req, res) => {
       'INSERT INTO pizza_sabores (empresa_id, subcategoria_id, nome, descricao, preco_adicional, disponivel) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [empresaId, subcategoria_id || null, nome, descricao || null, preco_adicional || 0, disponivel !== false]
     );
-    res.status(201).json({ success: true, sabor: result.rows[0] });
+    const sabor = result.rows[0];
+
+    // Auto-create produto in catalog
+    try {
+      let catId = null;
+      const catRes = await pool.query(
+        `SELECT id FROM categorias WHERE empresa_id = $1 AND LOWER(nome) LIKE '%pizza%' ORDER BY id LIMIT 1`,
+        [empresaId]
+      );
+      if (catRes.rows.length > 0) {
+        catId = catRes.rows[0].id;
+      } else {
+        const newCat = await pool.query(
+          `INSERT INTO categorias (empresa_id, nome, ordem) VALUES ($1, 'Pizzas', 99) RETURNING id`,
+          [empresaId]
+        );
+        catId = newCat.rows[0].id;
+      }
+      const minTamanho = await pool.query(
+        `SELECT MIN(preco) as min_preco FROM produto_tamanhos WHERE empresa_id = $1 AND produto_id IS NULL`,
+        [empresaId]
+      );
+      const precoDisplay = parseFloat(minTamanho.rows[0]?.min_preco || 0);
+      const prodRes = await pool.query(
+        `INSERT INTO produtos (empresa_id, categoria_id, nome, descricao, preco, disponivel, tipo, ordem)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pizza', 0) RETURNING id`,
+        [empresaId, catId, nome, descricao || null, precoDisplay, disponivel !== false]
+      );
+      await pool.query('UPDATE pizza_sabores SET produto_id = $1 WHERE id = $2', [prodRes.rows[0].id, sabor.id]);
+      sabor.produto_id = prodRes.rows[0].id;
+    } catch (e) {
+      console.error('Erro ao criar produto para sabor:', e.message);
+    }
+
+    res.status(201).json({ success: true, sabor });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -228,7 +262,17 @@ router.put('/sabores/:id', async (req, res) => {
       [subcategoria_id || null, nome, descricao || null, preco_adicional || 0, disponivel !== false, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Sabor não encontrado.' });
-    res.json({ success: true, sabor: result.rows[0] });
+    const sabor = result.rows[0];
+
+    // Sync to produto
+    if (sabor.produto_id) {
+      await pool.query(
+        `UPDATE produtos SET nome = $1, descricao = $2, disponivel = $3 WHERE id = $4`,
+        [nome, descricao || null, disponivel !== false, sabor.produto_id]
+      );
+    }
+
+    res.json({ success: true, sabor });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -236,7 +280,17 @@ router.put('/sabores/:id', async (req, res) => {
 
 router.delete('/sabores/:id', async (req, res) => {
   try {
+    // Get produto_id before deleting
+    const saborRes = await pool.query('SELECT produto_id FROM pizza_sabores WHERE id = $1', [req.params.id]);
+    const produtoId = saborRes.rows[0]?.produto_id;
+
     await pool.query('DELETE FROM pizza_sabores WHERE id = $1', [req.params.id]);
+
+    // Also delete the produto
+    if (produtoId) {
+      await pool.query('DELETE FROM produtos WHERE id = $1', [produtoId]);
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

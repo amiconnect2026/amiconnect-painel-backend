@@ -56,6 +56,7 @@ async function runMigrations() {
         UNIQUE(produto_id, sabor_id)
       )
     `);
+    await pool.query(`ALTER TABLE pizza_sabores ADD COLUMN IF NOT EXISTS produto_id INTEGER REFERENCES produtos(id) ON DELETE SET NULL`);
     console.log('✅ Migrations aplicadas');
   } catch (e) {
     console.error('❌ Erro nas migrations:', e.message);
