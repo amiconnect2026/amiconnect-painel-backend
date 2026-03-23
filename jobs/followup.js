@@ -24,6 +24,11 @@ async function runFollowup() {
             AND p.empresa_id = s.empresa_id
             AND p.created_at >= s.cardapio_enviado_em
         )
+        AND (
+          e.hora_abertura IS NULL
+          OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME
+             BETWEEN e.hora_abertura AND e.hora_fechamento
+        )
     `);
 
     for (const row of result.rows) {
