@@ -113,8 +113,7 @@ router.get('/:id', async (req, res) => {
       SELECT id, nome, horario_funcionamento, taxa_entrega, pedido_minimo,
              tempo_entrega_min, tempo_entrega_max, plano, formas_pagamento,
              endereco_restaurante, raio_entrega_km, latitude, longitude, foto_capa,
-             permite_retirada, tipo_negocio,
-             hora_abertura, hora_fechamento
+             permite_retirada, tipo_negocio
       FROM empresas
       WHERE id = $1
     `, [req.params.id]);
@@ -135,7 +134,7 @@ router.patch('/:id', async (req, res) => {
     if (req.user.role !== 'admin' && req.user.empresa_id !== parseInt(req.params.id)) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
-    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente, horario_funcionamento, permite_retirada, tipo_negocio, hora_abertura, hora_fechamento } = req.body;
+    const { taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, nome, whatsapp, plano, senha_gerente, horario_funcionamento, permite_retirada, tipo_negocio } = req.body;
     const result = await pool.query(`
       UPDATE empresas SET
         taxa_entrega = COALESCE($1, taxa_entrega),
@@ -154,12 +153,10 @@ router.patch('/:id', async (req, res) => {
         senha_gerente = COALESCE($15, senha_gerente),
         horario_funcionamento = COALESCE($16, horario_funcionamento),
         permite_retirada = COALESCE($17, permite_retirada),
-        tipo_negocio = COALESCE($18, tipo_negocio),
-        hora_abertura = COALESCE($19::TIME, hora_abertura),
-        hora_fechamento = COALESCE($20::TIME, hora_fechamento)
+        tipo_negocio = COALESCE($18, tipo_negocio)
       WHERE id = $10
-      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano, horario_funcionamento, permite_retirada, tipo_negocio, hora_abertura, hora_fechamento
-    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null, horario_funcionamento || null, permite_retirada ?? null, tipo_negocio || null, hora_abertura || null, hora_fechamento || null]);
+      RETURNING id, nome, taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, ativo, whatsapp, plano, horario_funcionamento, permite_retirada, tipo_negocio
+    `, [taxa_entrega, tempo_entrega_min, tempo_entrega_max, formas_pagamento, pedido_minimo, endereco_restaurante, raio_entrega_km, latitude, longitude, req.params.id, ativo ?? null, nome || null, whatsapp || null, plano || null, senha_gerente || null, horario_funcionamento || null, permite_retirada ?? null, tipo_negocio || null]);
     res.json({ empresa: result.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar empresa:', error);

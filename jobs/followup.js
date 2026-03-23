@@ -2,6 +2,27 @@ const pool = require('../config/database');
 
 const WEBHOOK_URL = 'https://n8n.amiconnect.com.br/webhook/followup-cardapio';
 
+function restauranteAberto(horario) {
+  if (!horario) return true;
+  const match = horario.match(/(\d{1,2})h(?:(\d{2}))?[\s-]+(\d{1,2})h(?:(\d{2}))?/);
+  if (!match) return true;
+  const horaAbre = parseInt(match[1]);
+  const minAbre = parseInt(match[2] || '0');
+  const horaFecha = parseInt(match[3]);
+  const minFecha = parseInt(match[4] || '0');
+  const agora = new Date().toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const [hAtual, mAtual] = agora.split(':').map(Number);
+  const totalAtual = hAtual * 60 + mAtual;
+  const totalAbre = horaAbre * 60 + minAbre;
+  const totalFecha = horaFecha * 60 + minFecha;
+  return totalAtual >= totalAbre && totalAtual < totalFecha;
+}
+
 async function runFollowup() {
   try {
     const result = await pool.query(`
@@ -10,7 +31,8 @@ async function runFollowup() {
         s.empresa_id,
         c.telefone,
         c.nome,
-        e.phone_number_id
+        e.phone_number_id,
+        e.horario_funcionamento
       FROM sessions s
       JOIN clientes c ON c.id = s.cliente_id
       JOIN empresas e ON e.id = s.empresa_id
@@ -24,14 +46,10 @@ async function runFollowup() {
             AND p.empresa_id = s.empresa_id
             AND p.created_at >= s.cardapio_enviado_em
         )
-        AND (
-          e.hora_abertura IS NULL
-          OR (NOW() AT TIME ZONE 'America/Sao_Paulo')::TIME
-             BETWEEN e.hora_abertura AND e.hora_fechamento
-        )
     `);
 
     for (const row of result.rows) {
+      if (!restauranteAberto(row.horario_funcionamento)) continue;
       try {
         await fetch(WEBHOOK_URL, {
           method: 'POST',

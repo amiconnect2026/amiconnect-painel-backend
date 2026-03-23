@@ -93,9 +93,9 @@ async function runMigrations() {
       );
     }
 
-    // Horário de funcionamento estruturado (para o job de follow-up)
-    await pool.query(`ALTER TABLE empresas ADD COLUMN IF NOT EXISTS hora_abertura TIME DEFAULT '09:00'`);
-    await pool.query(`ALTER TABLE empresas ADD COLUMN IF NOT EXISTS hora_fechamento TIME DEFAULT '22:00'`);
+    // Remover colunas hora_abertura/hora_fechamento criadas anteriormente (não utilizadas)
+    await pool.query(`ALTER TABLE empresas DROP COLUMN IF EXISTS hora_abertura`);
+    await pool.query(`ALTER TABLE empresas DROP COLUMN IF EXISTS hora_fechamento`);
 
     console.log('✅ Migrations aplicadas');
   } catch (e) {
