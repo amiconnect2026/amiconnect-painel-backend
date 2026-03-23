@@ -58,6 +58,41 @@ async function runMigrations() {
     `);
     await pool.query(`ALTER TABLE pizza_sabores ADD COLUMN IF NOT EXISTS produto_id INTEGER REFERENCES produtos(id) ON DELETE SET NULL`);
     await pool.query(`ALTER TABLE produto_tamanhos ADD COLUMN IF NOT EXISTS pedacos INTEGER`);
+
+    // Tamanhos de pizza como produtos reais (para gestão de complementos e disponibilidade)
+    await pool.query(`ALTER TABLE produtos ADD COLUMN IF NOT EXISTS tamanho_pizza_id INTEGER REFERENCES produto_tamanhos(id) ON DELETE SET NULL`);
+
+    // Remover produtos criados a partir de sabores (tipo='pizza' sem vínculo com tamanho)
+    await pool.query(`DELETE FROM produtos WHERE tipo = 'pizza' AND tamanho_pizza_id IS NULL`);
+
+    // Criar produtos para tamanhos existentes que ainda não têm produto vinculado
+    const tamanhosOrfaos = await pool.query(`
+      SELECT pt.* FROM produto_tamanhos pt
+      WHERE pt.produto_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM produtos p WHERE p.tamanho_pizza_id = pt.id)
+    `);
+    for (const t of tamanhosOrfaos.rows) {
+      let catId = null;
+      const catRes = await pool.query(
+        `SELECT id FROM categorias WHERE empresa_id = $1 AND LOWER(nome) LIKE '%pizza%' ORDER BY id LIMIT 1`,
+        [t.empresa_id]
+      );
+      if (catRes.rows.length > 0) {
+        catId = catRes.rows[0].id;
+      } else {
+        const newCat = await pool.query(
+          `INSERT INTO categorias (empresa_id, nome, ordem) VALUES ($1, 'Pizzas', 99) RETURNING id`,
+          [t.empresa_id]
+        );
+        catId = newCat.rows[0].id;
+      }
+      await pool.query(
+        `INSERT INTO produtos (empresa_id, categoria_id, nome, preco, disponivel, tipo, tamanho_pizza_id, ordem)
+         VALUES ($1, $2, $3, $4, true, 'pizza', $5, $6)`,
+        [t.empresa_id, catId, t.nome, t.preco, t.id, t.ordem || 0]
+      );
+    }
+
     console.log('✅ Migrations aplicadas');
   } catch (e) {
     console.error('❌ Erro nas migrations:', e.message);
