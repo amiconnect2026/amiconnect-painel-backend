@@ -290,7 +290,7 @@ router.get('/publico/:produto_id/complementos', async (req, res) => {
     }
 
     const gruposRes = await pool.query(
-      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas, habilitado FROM produto_grupos WHERE produto_id = $1 AND COALESCE(habilitado, true) = true ORDER BY id',
       [produto_id]
     );
 
@@ -326,7 +326,7 @@ router.get('/:id/complementos', async (req, res) => {
     }
 
     const gruposRes = await pool.query(
-      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas, habilitado FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [id]
     );
 
@@ -352,7 +352,7 @@ router.get('/:id/complementos', async (req, res) => {
 router.get('/:id/grupos', async (req, res) => {
   try {
     const gruposRes = await pool.query(
-      'SELECT id, nome, tipo, min_escolhas, max_escolhas FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
+      'SELECT id, nome, tipo, min_escolhas, max_escolhas, habilitado FROM produto_grupos WHERE produto_id = $1 ORDER BY id',
       [req.params.id]
     );
     const grupos = gruposRes.rows;
@@ -400,8 +400,33 @@ router.put('/grupos/:id', async (req, res) => {
 
 router.delete('/grupos/:id', async (req, res) => {
   try {
+    // Buscar produto_id antes de deletar
+    const grupoRes = await pool.query('SELECT produto_id FROM produto_grupos WHERE id = $1', [req.params.id]);
+    if (grupoRes.rows.length === 0) return res.status(404).json({ error: 'Grupo não encontrado.' });
+    const produto_id = grupoRes.rows[0].produto_id;
+
     await pool.query('DELETE FROM produto_grupos WHERE id = $1', [req.params.id]);
+
+    // Se não sobrou nenhum grupo, resetar tipo do produto para 'simples'
+    const countRes = await pool.query('SELECT COUNT(*) FROM produto_grupos WHERE produto_id = $1', [produto_id]);
+    if (parseInt(countRes.rows[0].count) === 0) {
+      await pool.query("UPDATE produtos SET tipo = 'simples' WHERE id = $1", [produto_id]);
+    }
+
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+router.patch('/grupos/:id/toggle', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE produto_grupos SET habilitado = NOT COALESCE(habilitado, true) WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Grupo não encontrado.' });
+    res.json({ success: true, grupo: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
