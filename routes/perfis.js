@@ -77,6 +77,23 @@ router.post('/publico/:id/enderecos', async (req, res) => {
       return res.status(400).json({ error: 'rua e numero são obrigatórios.' });
     }
 
+    // Verificar duplicata (mesmo perfil + mesma rua + mesmo número)
+    if (!substituir) {
+      const dup = await pool.query(
+        'SELECT id FROM perfis_enderecos WHERE perfil_id = $1 AND rua = $2 AND numero = $3 LIMIT 1',
+        [perfil_id, rua, numero]
+      );
+      if (dup.rows.length > 0) {
+        // Já existe — apenas marca como principal e retorna
+        await pool.query('UPDATE perfis_enderecos SET principal = false WHERE perfil_id = $1', [perfil_id]);
+        const upd = await pool.query(
+          'UPDATE perfis_enderecos SET principal = true WHERE id = $1 RETURNING *',
+          [dup.rows[0].id]
+        );
+        return res.json({ endereco: upd.rows[0] });
+      }
+    }
+
     // Se substituir=true, remover endereço existente com mesmo apelido
     if (substituir && apelido) {
       await pool.query(
