@@ -73,8 +73,8 @@ router.post('/publico/:id/enderecos', async (req, res) => {
     const perfil_id = req.params.id;
     const { apelido, rua, numero, bairro, complemento, cidade, lat, lng } = req.body;
 
-    if (!rua || !numero || !bairro) {
-      return res.status(400).json({ error: 'rua, numero e bairro são obrigatórios.' });
+    if (!rua || !numero) {
+      return res.status(400).json({ error: 'rua e numero são obrigatórios.' });
     }
 
     // Desmarcar principal anterior
