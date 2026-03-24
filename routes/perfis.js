@@ -71,10 +71,18 @@ router.get('/publico/:id/enderecos', async (req, res) => {
 router.post('/publico/:id/enderecos', async (req, res) => {
   try {
     const perfil_id = req.params.id;
-    const { apelido, rua, numero, bairro, complemento, cidade, lat, lng } = req.body;
+    const { apelido, rua, numero, bairro, complemento, cidade, lat, lng, substituir } = req.body;
 
     if (!rua || !numero) {
       return res.status(400).json({ error: 'rua e numero são obrigatórios.' });
+    }
+
+    // Se substituir=true, remover endereço existente com mesmo apelido
+    if (substituir && apelido) {
+      await pool.query(
+        'DELETE FROM perfis_enderecos WHERE perfil_id = $1 AND apelido = $2',
+        [perfil_id, apelido]
+      );
     }
 
     // Desmarcar principal anterior
@@ -87,8 +95,8 @@ router.post('/publico/:id/enderecos', async (req, res) => {
       INSERT INTO perfis_enderecos (perfil_id, apelido, rua, numero, bairro, complemento, cidade, lat, lng, principal)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
       RETURNING *
-    `, [perfil_id, apelido || 'Casa', rua, numero, bairro, complemento || null, cidade || null,
-        lat || null, lng || null]);
+    `, [perfil_id, apelido || 'Casa', rua, numero, bairro || null, complemento || null,
+        cidade || null, lat || null, lng || null]);
 
     res.json({ endereco: result.rows[0] });
   } catch (error) {
