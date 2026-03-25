@@ -42,6 +42,7 @@ const socketRoutes = require('./routes/socket');
 const relatoriosRoutes = require('./routes/relatorios');
 const perfisRoutes = require('./routes/perfis');
 const pizzasRoutes = require('./routes/pizzas');
+const taxaEntregaRoutes = require('./routes/taxa-entrega');
 const pool = require('./config/database');
 
 // Auto-migrate: apply pending schema changes safely
@@ -115,6 +116,7 @@ app.use('/api/socket', socketRoutes);
 app.use('/api/relatorios', relatoriosRoutes);
 app.use('/api/perfis', perfisRoutes);
 app.use('/api/pizzas', pizzasRoutes);
+app.use('/api/taxa-entrega', taxaEntregaRoutes);
 
 // Socket.io - conexões
 io.on('connection', (socket) => {
