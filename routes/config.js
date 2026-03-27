@@ -3,6 +3,7 @@ const router = express.Router();
 
 // GET /api/config/maps-key?secret=X
 router.get('/maps-key', (req, res) => {
+  console.log('SECRET ENV:', process.env.MAPS_KEY_SECRET);
   const { secret } = req.query;
   if (!secret || secret !== process.env.MAPS_KEY_SECRET) {
     return res.status(403).json({ error: 'Acesso negado.' });
