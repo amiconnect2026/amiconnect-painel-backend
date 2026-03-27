@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
 
-// GET /api/config/maps-key?secret=X
+const ALLOWED_ORIGINS = ['https://painel-admin.amiconnect.com.br'];
+
+// GET /api/config/maps-key — restrito por origem (CORS)
+// Aceita: requisições sem Origin (mesmo domínio) ou de ALLOWED_ORIGINS
 router.get('/maps-key', (req, res) => {
-  console.log('SECRET ENV:', process.env.MAPS_KEY_SECRET);
-  const { secret } = req.query;
-  if (!secret || secret !== process.env.MAPS_KEY_SECRET) {
+  const origin = req.get('origin') || '';
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
     return res.status(403).json({ error: 'Acesso negado.' });
+  }
+  if (origin) {
+    res.set('Access-Control-Allow-Origin', origin);
   }
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) {

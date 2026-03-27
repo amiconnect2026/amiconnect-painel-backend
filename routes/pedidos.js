@@ -6,7 +6,7 @@ const { filterByTenant } = require('../middleware/tenant');
 
 // GET /api/pedidos/status-entrega?telefone=xxx&empresa_id=yyy&webhook_secret=xxx
 router.get('/status-entrega', async (req, res) => {
-  if (req.query.webhook_secret !== 'amiconnect_webhook_2026') {
+  if (req.query.webhook_secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Não autorizado.' });
   }
 
