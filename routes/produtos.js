@@ -42,7 +42,8 @@ router.get('/publico/:empresa_id', async (req, res) => {
         c.nome as categoria_nome, c.ordem as categoria_ordem,
         CASE WHEN p.promocao_ativa = true AND p.desconto_percent IS NOT NULL
              THEN ROUND((p.preco * (1 - p.desconto_percent / 100.0))::numeric, 2)
-             ELSE p.preco END AS preco_final
+             ELSE p.preco END AS preco_final,
+        EXISTS(SELECT 1 FROM produto_grupos pg WHERE pg.produto_id = p.id AND pg.habilitado = true) AS has_grupos
       FROM produtos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.empresa_id = $1
@@ -72,9 +73,10 @@ router.get('/publico/:empresa_id', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         p.*,
-        c.nome as categoria_nome
+        c.nome as categoria_nome,
+        EXISTS(SELECT 1 FROM produto_grupos pg WHERE pg.produto_id = p.id AND pg.habilitado = true) AS has_grupos
       FROM produtos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.empresa_id = $1
