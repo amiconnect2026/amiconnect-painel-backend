@@ -349,6 +349,45 @@ router.get('/:id/complementos', async (req, res) => {
 });
 
 // ==========================================
+// GET /api/produtos/grupos/empresa — grupos distintos da empresa (para copiar)
+// ==========================================
+router.get('/grupos/empresa', async (req, res) => {
+  try {
+    const empresaId = req.user.role === 'admin'
+      ? req.query.empresa_id || null
+      : req.user.empresa_id;
+
+    if (!empresaId) {
+      return res.status(400).json({ error: 'empresa_id é obrigatório.' });
+    }
+
+    // Um representante por nome (o de menor id)
+    const gruposRes = await pool.query(`
+      SELECT DISTINCT ON (pg.nome)
+        pg.id, pg.nome, pg.tipo, pg.min_escolhas, pg.max_escolhas
+      FROM produto_grupos pg
+      INNER JOIN produtos p ON pg.produto_id = p.id
+      WHERE p.empresa_id = $1 AND pg.habilitado = true
+      ORDER BY pg.nome, pg.id
+    `, [empresaId]);
+
+    const grupos = gruposRes.rows;
+    for (const grupo of grupos) {
+      const opcoesRes = await pool.query(
+        'SELECT nome, preco_adicional, disponivel FROM produto_opcoes WHERE grupo_id = $1 ORDER BY id',
+        [grupo.id]
+      );
+      grupo.opcoes = opcoesRes.rows;
+    }
+
+    res.json({ grupos });
+  } catch (error) {
+    console.error('Erro ao buscar grupos da empresa:', error);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ==========================================
 // Grupos CRUD
 // ==========================================
 router.get('/:id/grupos', async (req, res) => {
