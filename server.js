@@ -44,6 +44,8 @@ const perfisRoutes = require('./routes/perfis');
 const pizzasRoutes = require('./routes/pizzas');
 const taxaEntregaRoutes = require('./routes/taxa-entrega');
 const configRoutes = require('./routes/config');
+const posVendaRoutes = require('./routes/pos-venda');
+const sessionsRoutes = require('./routes/sessions');
 const pool = require('./config/database');
 
 // Auto-migrate: apply pending schema changes safely
@@ -99,6 +101,11 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE empresas DROP COLUMN IF EXISTS hora_abertura`);
     await pool.query(`ALTER TABLE empresas DROP COLUMN IF EXISTS hora_fechamento`);
 
+    // Pós-venda: colunas para pausa por cliente e indicador de contato
+    await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pausado_ate TIMESTAMP`);
+    await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS origem_pausa VARCHAR(50)`);
+    await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pos_venda_contatado_em TIMESTAMP`);
+
     console.log('✅ Migrations aplicadas');
   } catch (e) {
     console.error('❌ Erro nas migrations:', e.message);
@@ -119,6 +126,8 @@ app.use('/api/perfis', perfisRoutes);
 app.use('/api/pizzas', pizzasRoutes);
 app.use('/api/taxa-entrega', taxaEntregaRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/pos-venda', posVendaRoutes);
+app.use('/api/sessions', sessionsRoutes);
 
 // Socket.io - conexões
 io.on('connection', (socket) => {
