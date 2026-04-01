@@ -21,15 +21,14 @@ router.post('/nova-mensagem', (req, res) => {
 
 // POST /api/socket/novo-pedido - chamado pelo n8n após salvar pedido
 router.post('/novo-pedido', (req, res) => {
-  const { empresa_id, cliente_nome, total, webhook_secret } = req.body;
+  const { empresa_id, cliente_nome, total, webhook_secret, pedido_id } = req.body;
   if (webhook_secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Não autorizado.' });
   }
   const io = req.app.get('io');
   if (io) {
     io.to(`empresa_${empresa_id}`).emit('novo_pedido', {
-      pedido_id: req.body.pedido_id || Date.now(),
-      cliente_nome, total, empresa_id
+      pedido_id, cliente_nome, total, empresa_id
     });
   }
   res.json({ success: true });
