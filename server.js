@@ -105,6 +105,7 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pausado_ate TIMESTAMP`);
     await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS origem_pausa VARCHAR(50)`);
     await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pos_venda_contatado_em TIMESTAMP`);
+    await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ativo'`);
 
     console.log('✅ Migrations aplicadas');
   } catch (e) {
