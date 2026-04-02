@@ -28,7 +28,7 @@ router.post('/pausar', async (req, res) => {
       UPDATE sessions SET
         status = 'humano',
         origem_pausa = $3,
-        pausado_ate = NOW() + make_interval(hours => $4::int),
+        pausado_ate = NOW() + ($4::int * interval '1 hour'),
         pos_venda_contatado_em = CASE WHEN $3 = 'pos_venda' THEN NOW() ELSE pos_venda_contatado_em END
       WHERE empresa_id = $1
         AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2 AND empresa_id = $1 LIMIT 1)
