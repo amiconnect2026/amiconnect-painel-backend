@@ -40,7 +40,7 @@ router.post('/pausar', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Erro sessions/pausar:', error);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
+    res.status(500).json({ error: 'Erro interno do servidor.', debug: error.message });
   }
 });
 
