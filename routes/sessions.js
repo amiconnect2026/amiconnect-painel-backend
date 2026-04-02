@@ -22,7 +22,9 @@ router.post('/pausar', async (req, res) => {
       return res.status(400).json({ error: 'empresa_id e cliente_telefone são obrigatórios.' });
     }
 
-    await pool.query(`
+    console.log('[POS VENDA] pausar chamado com:', req.body);
+
+    const result = await pool.query(`
       UPDATE sessions SET
         status = 'humano',
         origem_pausa = $3,
@@ -31,6 +33,8 @@ router.post('/pausar', async (req, res) => {
       WHERE empresa_id = $1
         AND cliente_id = (SELECT id FROM clientes WHERE telefone = $2 AND empresa_id = $1 LIMIT 1)
     `, [empresaId, cliente_telefone, origem_pausa, horas]);
+
+    console.log('[POS VENDA] resultado rowCount:', result.rowCount);
 
     res.json({ success: true });
   } catch (error) {
