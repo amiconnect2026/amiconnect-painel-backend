@@ -18,12 +18,16 @@ router.get('/', async (req, res) => {
     }
 
     const result = await pool.query(`
-      SELECT 
+      SELECT
         c.*,
-        u.nome as atendente_nome
+        u.nome as atendente_nome,
+        s.status as session_status,
+        s.origem_pausa as session_origem_pausa
       FROM conversas c
       LEFT JOIN usuarios u ON c.atendente_id = u.id
-      WHERE c.empresa_id = $1 
+      LEFT JOIN clientes cl ON cl.telefone = c.cliente_telefone AND cl.empresa_id = c.empresa_id
+      LEFT JOIN sessions s ON s.cliente_id = cl.id AND s.empresa_id = c.empresa_id
+      WHERE c.empresa_id = $1
         AND c.status = 'ativa'
       ORDER BY c.ultima_msg_em DESC
     `, [empresaId]);
