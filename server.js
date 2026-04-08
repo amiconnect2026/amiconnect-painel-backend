@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+const pool = require('./config/database');
 
 const app = express();
 const server = http.createServer(app);
@@ -173,6 +174,25 @@ app.use((err, req, res, next) => {
 // Jobs
 const { iniciarFollowup } = require('./jobs/followup');
 iniciarFollowup();
+
+// Verificar sessões expiradas a cada 30 minutos
+setInterval(async () => {
+  try {
+    await pool.query(`
+      UPDATE sessions SET
+        status = 'ativo',
+        origem_pausa = NULL,
+        pausado_ate = NULL,
+        updated_at = NOW()
+      WHERE pausado_ate IS NOT NULL
+        AND pausado_ate < NOW()
+        AND status = 'humano'
+    `);
+    console.log('✅ Sessões expiradas resetadas');
+  } catch (e) {
+    console.error('Erro ao resetar sessões:', e.message);
+  }
+}, 30 * 60 * 1000);
 
 // Iniciar servidor
 server.listen(PORT, () => {
